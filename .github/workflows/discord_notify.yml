@@ -63,7 +63,7 @@ jobs:
           CHANGES=$(jq -r '.changes[] | "- " + .' discord/version.json)
 
           printf '%s\n\n%s\n\n%s\n\n%s\n\n%s\n\n🎯 **[Jetzt spielen](%s)**  📋 **[Commits](%s)**\n' \
-            "@everyone" \
+            "<@&1535341250604171326>" \
             "$H1" \
             "$DESCRIPTION" \
             "$H3" \
@@ -72,7 +72,7 @@ jobs:
             "$REPO_URL" > /tmp/msg_text.txt
 
           jq -n --rawfile text /tmp/msg_text.txt \
-            '{content: $text, allowed_mentions: {parse: ["everyone"]}, flags: 4}' \
+            '{content: $text, allowed_mentions: {roles: ["1535341250604171326"]}, flags: 4}' \
             > /tmp/payload.json
 
           echo "--- Payload preview ---"
