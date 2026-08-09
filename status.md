@@ -26,8 +26,7 @@ Was v3.0 geändert hat (Details in `CLAUDE.md`):
 
 ## Zu besprechen
 
-- **`AUFGABEN.md` ist veraltet:** enthält die ursprüngliche Bauanleitung, jeder Punkt noch
-  unangehakt, obwohl das Spiel seit v1.0 läuft. Archivieren oder löschen?
+*(nichts offen)*
 
 ## Warten auf Feedback
 
@@ -40,6 +39,8 @@ Was v3.0 geändert hat (Details in `CLAUDE.md`):
 
 ## Archiv
 
+- **10.08.2026 – `AUFGABEN.md` gelöscht** (`9880737`). Ursprüngliche Bauanleitung vom Juni,
+  kein Punkt je abgehakt. Stand steht in dieser Datei, Historie in `CLAUDE.md`.
 - **10.08.2026 – v3.1: Bedienung des Vorabdownloads + drei echte Fehler dabei gefunden.**
   „⬇ Bilder für offline"-Knopf lädt alle Kategorien am Stück, Speicheranzeige mit Leeren-Knopf,
   Bildmodus offline gesperrt solange nichts geladen ist, nicht geladene Kategorien offline
