@@ -1,6 +1,6 @@
 # Status – Ratespiel „Wer bin ich?"
 
-Stand: 10.08.2026 · **v3.3 ist live** auf GitHub Pages. Offline-Test auf dem Handy bestanden.
+Stand: 10.08.2026 · **v3.4 ist live** auf GitHub Pages. Offline-Test auf dem Handy bestanden.
 
 ## In Arbeit
 
@@ -16,8 +16,11 @@ Stand: 10.08.2026 · **v3.3 ist live** auf GitHub Pages. Offline-Test auf dem Ha
 
 ## Warten auf Feedback
 
+- **Daniel: App neu installieren** (1 SP) — Seite im Browser öffnen, links steht jetzt
+  „📲 Als App installieren". Falls Chrome keinen Dialog anbietet, zeigt der Knopf die Anleitung
+  über das ⋮-Menü.
 - **Daniel: Startdauer vom Handy ablesen** (1 SP) — App vom Home-Bildschirm starten, unten links
-  steht jetzt `v3.3 · <Zahl> ms`. Kleine Zahl trotz langem Warten heißt: die Zeit vergeht
+  steht jetzt `v3.4 · <Zahl> ms`. Kleine Zahl trotz langem Warten heißt: die Zeit vergeht
   **vor** unserem Code (Browser-Kaltstart, Service-Worker-Start, PWA-Splash) und lässt sich in
   der App nicht wegoptimieren. Große Zahl heißt: es liegt weiter bei uns, dann weitersuchen.
 
@@ -35,6 +38,13 @@ Stand: 10.08.2026 · **v3.3 ist live** auf GitHub Pages. Offline-Test auf dem Ha
 
 - **10.08.2026 – Offline-Test auf dem Handy bestanden** („klappt"). Damit ist der eigentliche
   Anlass — das Spiel lief auf dem Fest ohne Internet nicht — erledigt.
+- **10.08.2026 – v3.4: Installierbarkeit repariert.** Von Daniel gemeldet: nach dem
+  Deinstallieren bot die Seite keinen Weg zurück. Ursache war der v3.3-Umbau, der
+  `serviceWorker.register()` in den Leerlauf verschob — ohne registrierten Worker stuft Chrome
+  die Seite nicht als installierbar ein und `beforeinstallprompt` bleibt aus. Registrierung
+  wieder sofort, dazu ein dauerhafter Installations-Knopf, der ohne Prompt die Anleitung zeigt.
+  Nebenbei: die Standalone-Erkennung prüfte nur `display-mode: standalone`, das Manifest sagt
+  aber `fullscreen`.
 - **10.08.2026 – v3.3: Startpfad freigeräumt.** Größte Bremse war, dass gar nichts gerendert
   wurde, bevor `app.js` durch war (jeder Screen stand `hidden` im HTML). Dahinter
   `new AudioContext()` auf Modulebene, das die Audio-Hardware hochfährt und dabei blockiert.

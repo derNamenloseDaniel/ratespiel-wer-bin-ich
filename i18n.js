@@ -50,6 +50,8 @@ const TRANSLATIONS = {
     storageUsed: 'offline gespeichert',
     imageNeedsNet: 'Bildmodus braucht Internet – oder vorab geladene Bilder',
     catNeedsDownload: 'Offline nicht verfügbar – Bilder wurden nicht vorab geladen',
+    installBtn: '📲 Als App installieren',
+    close: 'Schließen',
     cats: {
       persons: 'Berühmte Personen',
       jobs: 'Berufe',
@@ -115,6 +117,8 @@ const TRANSLATIONS = {
     storageUsed: 'stored offline',
     imageNeedsNet: 'Image mode needs internet – or images downloaded in advance',
     catNeedsDownload: 'Not available offline – images were not downloaded',
+    installBtn: '📲 Install as app',
+    close: 'Close',
     cats: {
       persons: 'Famous People',
       jobs: 'Professions',

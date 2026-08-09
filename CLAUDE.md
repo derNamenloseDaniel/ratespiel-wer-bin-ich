@@ -38,6 +38,7 @@ Nie vergessen. Keine Ausnahme.
 | v3.1        | v26        | 2026-08-10 | "Bilder für offline"-Knopf (alle Kategorien) + Speicheranzeige; Bildmodus offline gesperrt, solange nichts geladen ist; Bilder per CORS-fetch statt <img> (opaque-Padding); Abbruch erst nach 5 Fehlschlägen **in Folge** |
 | v3.2        | v27        | 2026-08-10 | Speicheranzeige zählt den Media-Cache selbst statt `storage.estimate()` – nach "Leeren" stand dort weiter der alte Wert |
 | v3.3        | v28        | 2026-08-10 | Startzeit: Startscreen ohne JS sichtbar, AudioContext erst beim ersten Ton, Speicherzählung und SW-Registrierung in die Leerlaufzeit, SW frischt je Datei nur einmal pro Lebensdauer auf; Startdauer am Versionslabel abzulesen |
+| v3.4        | v29        | 2026-08-10 | SW-Registrierung wieder sofort (v3.3 hat damit die Installierbarkeit zerschossen); dauerhafter „Als App installieren"-Knopf mit Anleitung, wenn der Browser kein `beforeinstallprompt` schickt |
 
 ## Offline – die Regeln, die dabei gelernt wurden
 
@@ -82,8 +83,20 @@ Nichts Blockierendes vor dem ersten Bild:
 - **kein `new AudioContext()` auf Modulebene** — der Konstruktor fährt die Audio-Hardware hoch
   und blockiert in einer synchronen `<script>`-Datei den Aufbau. Erst beim ersten Ton bauen.
 - **keine Cache-Durchläufe im Startpfad** (Speicherzählung) — `requestIdleCallback`.
-- **`serviceWorker.register()` erst im Leerlauf** — die Registrierung stößt den Netzabruf von
-  `sw.js` an; die Seite läuft ohnehin schon unter dem Worker der letzten Sitzung.
+**Ausnahme, teuer gelernt:** `serviceWorker.register()` gehört **nicht** in den Leerlauf. Chrome
+prüft kurz nach dem Laden, ob die Seite installierbar ist, und dazu muss der Worker registriert
+sein. In v3.3 stand dort ein `requestIdleCallback` — Folge: `beforeinstallprompt` feuerte nicht
+mehr und die App ließ sich nicht mehr installieren. Der Zeitgewinn war ohnehin eingebildet,
+`register()` arbeitet asynchron.
+
+## Installation muss ohne `beforeinstallprompt` funktionieren
+
+Der Knopf „Als App installieren" auf dem Startbildschirm ist immer da, solange die App im Browser
+läuft (`isStandalone()` prüft `display-mode: standalone` **und** `fullscreen` — das Manifest sagt
+`fullscreen`, `standalone` allein ist dort also falsch). Schickt der Browser ein
+`beforeinstallprompt`, löst der Knopf es aus; sonst zeigt er die Anleitung für Chrome bzw. Safari.
+Grund: Chrome unterdrückt das Ereignis unter anderem eine Weile nach einer Deinstallation — dann
+gab es vorher überhaupt keinen Weg mehr zurück auf den Home-Bildschirm.
 
 Gemessen wird nicht geschätzt: das Versionslabel zeigt die Startdauer (`v3.3 · 14 ms`). Steht dort
 eine kleine Zahl, der Start fühlt sich aber trotzdem lang an, liegt es **vor** unserem Code

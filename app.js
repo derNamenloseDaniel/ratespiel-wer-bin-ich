@@ -863,14 +863,46 @@ function _calibSave() {
 // ── PWA Install ────────────────────────────────────────────────────────────
 let _deferredInstall = null;
 
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
+const isStandalone = () =>
+  window.matchMedia('(display-mode: standalone)').matches ||
+  window.matchMedia('(display-mode: fullscreen)').matches ||
+  window.navigator.standalone === true;
+
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
   _deferredInstall = e;
-  // Only show if not already installed
-  if (!window.matchMedia('(display-mode: standalone)').matches) {
+  if (!isStandalone()) {
+    show('btn-install-inline');
     show('install-overlay');
+    show('btn-install-app');
+    hide('install-ios-hint');
+    hide('install-android-hint');
   }
 });
+
+// Der Weg zur Installation darf nicht davon abhängen, ob der Browser uns ein
+// `beforeinstallprompt` schickt. Chrome unterdrückt das Ereignis unter anderem
+// eine Weile nach einer Deinstallation – dann stand hier vorher überhaupt keine
+// Möglichkeit mehr, die App wieder aufs Handy zu holen. Ohne Prompt zeigen wir
+// deshalb die Anleitung für den jeweiligen Browser.
+async function openInstall() {
+  if (_deferredInstall) {
+    show('btn-install-app');
+    hide('install-ios-hint');
+    hide('install-android-hint');
+    _deferredInstall.prompt();
+    await _deferredInstall.userChoice;
+    _deferredInstall = null;
+    hide('install-overlay');
+    return;
+  }
+  hide('btn-install-app');
+  if (isIOS()) { show('install-ios-hint'); hide('install-android-hint'); }
+  else { show('install-android-hint'); hide('install-ios-hint'); }
+  $('btn-install-skip').textContent = t('close');
+  show('install-overlay');
+}
 
 // ── Update-Reload ──────────────────────────────────────────────────────────
 // Neue Version = Neuladen. Aber nie mitten in einer laufenden Runde – das hat
@@ -1051,16 +1083,9 @@ document.addEventListener('DOMContentLoaded', () => {
     show('sensor-area');
   }
 
-  // PWA install buttons
-  $('btn-install-app').addEventListener('click', async () => {
-    if (_deferredInstall) {
-      // Android/Chrome: trigger native install prompt
-      _deferredInstall.prompt();
-      const { outcome } = await _deferredInstall.userChoice;
-      _deferredInstall = null;
-    }
-    hide('install-overlay');
-  });
+  // PWA install
+  $('btn-install-inline').addEventListener('click', openInstall);
+  $('btn-install-app').addEventListener('click', openInstall);
 
   $('btn-install-skip').addEventListener('click', () => {
     hide('install-overlay');
@@ -1069,19 +1094,26 @@ document.addEventListener('DOMContentLoaded', () => {
     (el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen)?.call(el);
   });
 
-  // iOS: show manual instructions instead of install button
-  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-  if (isIOS && !isStandalone) {
-    show('install-overlay');
-    hide('btn-install-app');
-    show('install-ios-hint');
+  // Läuft die App im Browser statt vom Home-Bildschirm, ist der Installations-
+  // knopf dauerhaft da – unabhängig davon, ob der Browser ein
+  // `beforeinstallprompt` schickt.
+  if (!isStandalone()) {
+    show('btn-install-inline');
+    if (isIOS()) {
+      show('install-overlay');
+      hide('btn-install-app');
+      show('install-ios-hint');
+    }
   }
 
   // Service Worker – auto-reload when a new version activates.
-  // Die Registrierung stößt einen Netzabruf von sw.js an (Update-Prüfung).
-  // Der gehört hinter das erste Bild, nicht davor – die Seite läuft ja bereits
-  // unter dem schon registrierten Worker aus der letzten Sitzung.
+  // Die Registrierung MUSS sofort passieren und darf nicht in den Leerlauf
+  // verschoben werden: Chrome prüft kurz nach dem Laden, ob die Seite
+  // installierbar ist, und dazu muss ein Service Worker registriert sein.
+  // In v3.3 stand hier ein requestIdleCallback – Ergebnis war, dass
+  // `beforeinstallprompt` nicht mehr feuerte und die App sich nicht mehr
+  // installieren ließ. Der Zeitgewinn war ohnehin eingebildet: register()
+  // arbeitet asynchron, der Abruf von sw.js blockiert den Hauptthread nicht.
   if ('serviceWorker' in navigator) {
     // Beim allerersten Besuch übernimmt der SW die Seite (clients.claim) –
     // das ist ein Controller-Wechsel ohne neue Version und darf kein Reload sein.
@@ -1091,12 +1123,10 @@ document.addEventListener('DOMContentLoaded', () => {
       else { hadController = true; renderOfflineStatus(); }
     });
 
-    const registerSW = () => navigator.serviceWorker.register('./sw.js')
+    navigator.serviceWorker.register('./sw.js')
       .then(() => navigator.serviceWorker.ready)
       .then(renderOfflineStatus)
       .catch(console.warn);
-    if ('requestIdleCallback' in window) requestIdleCallback(registerSW, { timeout: 3000 });
-    else setTimeout(registerSW, 800);
   }
 
   setOffline(!navigator.onLine);
