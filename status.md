@@ -1,28 +1,14 @@
 # Status – Ratespiel „Wer bin ich?"
 
-Stand: 09.08.2026 · Arbeitsstand **v3.0 (Offline-Fähigkeit)** liegt uneingecheckt im Arbeitsverzeichnis.
+Stand: 10.08.2026 · **v3.1 ist live** auf GitHub Pages. Offen ist nur noch der Test auf echten Geräten.
 
 ## In Arbeit
 
-| Task | SP | Stand |
-|---|---|---|
-| Offline-Fähigkeit v3.0 | 5 | Code fertig, **nicht verifiziert, nicht committet** |
-
-Was v3.0 geändert hat (Details in `CLAUDE.md`):
-
-- `sw.js` → cache-first Shell + stale-while-revalidate, eigener dauerhafter Media-Cache für
-  Wikipedia-Bilder, Icons mit im Precache, nie mehr `respondWith(undefined)`
-- `app.js` → 5-s-Timeout auf jeden Netzzugriff, Bild-URL-Gedächtnis im localStorage,
-  Bildmodus fällt offline auf das Wort zurück statt das Deck durchzurasen,
-  Vorabdownload je Kategorie, Offline-Anzeige, kein SW-Reload mitten im Spiel
-- `index.html` / `style.css` / `i18n.js` → Offline-Chip, HUD-Badge 📴, ⬇-Knopf je Kategorie
-- Version auf v3.0 / SW-Cache v25 gebumpt
+*(nichts)*
 
 ## Queue
 
-1. **Auf dem echten Handy testen** (2 SP) — einmal mit WLAN öffnen, Kategorien per ⬇ laden,
-   „✅ Offline spielbereit" abwarten, Flugmodus, spielen. Idealerweise auf Android *und* iOS,
-   weil Safari den Service Worker anders behandelt.
+*(nichts)*
 
 ## Zu besprechen
 
@@ -30,12 +16,21 @@ Was v3.0 geändert hat (Details in `CLAUDE.md`):
 
 ## Warten auf Feedback
 
-- Daniel: geht die Restpunkte gerade 1:1 durch (10.08.2026)
+- **Daniel: Test auf dem echten Handy** (2 SP) — mit WLAN öffnen (unten links muss **v3.1**
+  stehen), Bildmodus wählen, „⬇ Bilder für offline" laufen lassen (~3–4 min, ~90 MB), auf
+  „✅ Offline spielbereit" warten, zum Home-Bildschirm hinzufügen, dann Flugmodus und spielen.
+  Idealerweise auf Android *und* iOS, weil Safari den Service Worker anders behandelt.
+  Der lokale Test deckt genau das nicht ab: echter Sensor, echtes Safari, echte Speichergrenzen.
+
+## Entschieden
+
+- **Bildmodus offline** (bestätigt 10.08.2026): gesperrt nur dann, wenn *keine* Bilder geladen
+  sind. Mit vorab geladenen Bildern bleibt er offen. Kurzform: online herunterladen, offline
+  spielen — ohne Daten und ohne Netz gesperrt.
 
 ## Später (nice to have)
 
 - Bilder auch für den Wortmodus vorhalten, damit man mitten in der Runde umschalten kann
-- Anzeige, wie viel Speicher die geladenen Bilder belegen (`navigator.storage.estimate()`)
 
 ## Archiv
 
