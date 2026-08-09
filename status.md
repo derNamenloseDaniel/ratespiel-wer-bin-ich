@@ -20,17 +20,12 @@ Was v3.0 geändert hat (Details in `CLAUDE.md`):
 
 ## Queue
 
-1. **Committen + pushen** (1 SP) — Push geht direkt auf GitHub Pages.
-2. **Auf dem echten Handy testen** (2 SP) — einmal mit WLAN öffnen, Kategorien per ⬇ laden,
+1. **Auf dem echten Handy testen** (2 SP) — einmal mit WLAN öffnen, Kategorien per ⬇ laden,
    „✅ Offline spielbereit" abwarten, Flugmodus, spielen. Idealerweise auf Android *und* iOS,
    weil Safari den Service Worker anders behandelt.
 
 ## Zu besprechen
 
-- **Speicherbedarf des Bild-Vorabdownloads:** eine Kategorie ≈ 50 Bilder ≈ 3–5 MB, alle elf
-  also grob 40 MB. Reicht das Laden je Kategorie, oder soll ein „alles laden"-Knopf dazu?
-- **Obergrenze des Media-Caches** steht aktuell bei 900 Einträgen (älteste fliegen zuerst).
-  Bei elf voll geladenen Kategorien wird das knapp — anheben oder so lassen?
 - **`AUFGABEN.md` ist veraltet:** enthält die ursprüngliche Bauanleitung, jeder Punkt noch
   unangehakt, obwohl das Spiel seit v1.0 läuft. Archivieren oder löschen?
 
@@ -45,6 +40,17 @@ Was v3.0 geändert hat (Details in `CLAUDE.md`):
 
 ## Archiv
 
+- **10.08.2026 – v3.1: Bedienung des Vorabdownloads + drei echte Fehler dabei gefunden.**
+  „⬇ Bilder für offline"-Knopf lädt alle Kategorien am Stück, Speicheranzeige mit Leeren-Knopf,
+  Bildmodus offline gesperrt solange nichts geladen ist, nicht geladene Kategorien offline
+  ausgegraut. Beim Testen aufgefallen und behoben: (1) Bilder per `<img>` geholt = opaque
+  Antworten = 308 MB statt 11 MB angerechnet → jetzt CORS-`fetch` + `ignoreVary`;
+  (2) Wikipedia drosselt mit HTTP 429 → Sammelabfrage für 25 Begriffe statt Einzelanfragen,
+  429 wird abgewartet statt als Offline gewertet; (3) ein einzelner Fehlschlag hat die App
+  fälschlich auf „offline" gestellt → erst drei in Folge zählen.
+  Gemessen: eine Kategorie = 45 Bilder = 7,9 MB, alle elf also grob 90 MB.
+  Media-Cache-Grenze deshalb auf 1500 Einträge, API-Antworten landen gar nicht mehr im Cache.
+- **10.08.2026 – v3.0 committet und gepusht** (`e61d537`), damit auf GitHub Pages live.
 - **10.08.2026 – Lokale Verifikation v3.0 bestanden.** Auf `localhost:8080` geprüft: SW aktiv,
   alle 9 Shell-Dateien im Precache. Danach Server gestoppt und Seite neu geladen → App startet
   vollständig aus dem Cache. Wortmodus offline spielbar (Karten wechseln, Punkte zählen).

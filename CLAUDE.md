@@ -35,6 +35,7 @@ Nie vergessen. Keine Ausnahme.
 | v2.8        | v23        | 2026-06-24 | Endlos-Modus: hochzählender Timer (MM:SS) im Spielbildschirm |
 | v2.9        | v24        | 2026-06-24 | Kalibrierungscard: Overlay "✅ Kalibriert" wenn bereits kalibriert, Klick zum Aufdecken |
 | v3.0        | v25        | 2026-08-09 | Offline-fähig: SW cache-first, Netz-Timeouts, Bild-Vorabdownload je Kategorie |
+| v3.1        | v26        | 2026-08-10 | "Bilder für offline"-Knopf (alle Kategorien) + Speicheranzeige; Bildmodus offline gesperrt, solange nichts geladen ist; Bilder per CORS-fetch statt <img> (opaque-Padding); Abbruch erst nach 5 Fehlschlägen **in Folge** |
 
 ## Offline – die Regeln, die dabei gelernt wurden
 
@@ -50,6 +51,19 @@ Nie vergessen. Keine Ausnahme.
 4. **`cache.addAll()` ist all-or-nothing:** eine einzige fehlende Datei verhindert die komplette
    Offline-Fähigkeit. Deshalb einzeln `add()` mit `catch`.
 5. **Kein Reload mitten im Spiel.** Ein SW-Update darf erst auf dem Startscreen neu laden.
+6. **Beim Entwickeln hinkt cache-first eine Runde hinterher.** Nach einer Änderung an
+   `app.js`/`style.css` zeigt der erste Reload noch die alte Datei — die neue landet dabei nur im
+   Hintergrund im Cache und greift erst beim zweiten Reload. Wer das nicht weiß, testet die
+   Vorgängerversion und wundert sich. Also: zweimal neu laden, oder `caches.delete()` vorweg.
+7. **Wikipedia drosselt (HTTP 429).** Eine Anfrage pro Wort × drei parallele Worker reicht schon,
+   um nach ein paar hundert Wörtern gedrosselt zu werden. Deshalb Sammelabfrage
+   (`titles=A|B|C`, bis zu 25 Stück) statt Einzelabfragen, und 429 als "warte kurz" behandeln,
+   nicht als Netzausfall — sonst hält die App sich fälschlich für offline.
+8. **Bilder per `fetch()` mit CORS holen, nicht per `new Image()`.** Ein `<img>` erzeugt eine
+   no-cors-Anfrage; solche "opaque" Antworten rechnet der Browser mit ~7 MB pro Stück auf das
+   Speicherkontingent an. 48 Bilder wurden so als 308 MB verbucht statt als 11 MB.
+   Nötig dazu: `cache.match(req, { ignoreVary: true })`, sonst findet das `<img>` den per
+   `fetch()` abgelegten Eintrag wegen abweichender `Accept`-Header nicht wieder.
 
 ## Projekt-Übersicht
 

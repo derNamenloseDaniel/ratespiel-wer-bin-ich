@@ -7,17 +7,22 @@
 // Der catch() greift also nie oder erst nach Minuten → die App startete nicht.
 // Deshalb: Shell IMMER zuerst aus dem Cache, Netz nur noch im Hintergrund.
 
-const VERSION   = 'v25';
+const VERSION   = 'v26';
 const SHELL     = `ratespiel-shell-${VERSION}`;
 const MEDIA     = 'ratespiel-media';   // Wikipedia-Bilder/-Antworten, überlebt Versionswechsel
-const MEDIA_MAX = 900;                 // grobe Obergrenze an Einträgen
+// Reicht für alle elf Kategorien (~540 Bilder) mit reichlich Luft. Gezählt
+// werden nur Bilder – die API-Antworten landen bewusst nicht im Cache, weil
+// die Bild-URLs ohnehin im localStorage stehen (IMG_MEMO). Sonst wäre über die
+// Hälfte der Einträge Beiwerk und würde echte Bilder aus dem Cache verdrängen.
+const MEDIA_MAX = 1500;
 
 const ASSETS = [
   './', './index.html', './style.css', './app.js', './i18n.js', './data.js',
   './manifest.json', './icons/icon-192.png', './icons/icon-512.png',
 ];
 
-const isMedia = url => /(^|\.)wiki(p|m)edia\.org$/.test(url.hostname);
+const isWiki   = url => /(^|\.)wiki(p|m)edia\.org$/.test(url.hostname);
+const isWikiApi = url => url.pathname.endsWith('/api.php');
 
 // ── Install ────────────────────────────────────────────────────────────────
 self.addEventListener('install', e => {
@@ -50,7 +55,12 @@ self.addEventListener('fetch', e => {
 
   const url = new URL(req.url);
 
-  if (isMedia(url)) { e.respondWith(mediaFirst(req)); return; }
+  if (isWiki(url)) {
+    // API-Antworten laufen ungecacht durch – offline werden sie nicht
+    // gebraucht, die Bild-URLs stehen im localStorage.
+    if (!isWikiApi(url)) e.respondWith(mediaFirst(req));
+    return;
+  }
   if (url.origin !== location.origin) return;          // Fremdes: Browser macht das
   if (url.pathname.endsWith('/sw.js')) return;         // SW-Update nie aus dem Cache
 
@@ -85,8 +95,10 @@ async function shellFirst(req) {
 
 // Wikipedia: einmal geholt = für immer offline verfügbar.
 async function mediaFirst(req) {
-  const cache  = await caches.open(MEDIA);
-  const cached = await cache.match(req);
+  const cache = await caches.open(MEDIA);
+  // ignoreVary, weil der Vorabdownload per fetch() lädt, das <img> im Spiel
+  // aber andere Accept-Header schickt – ohne das wäre der Treffer futsch.
+  const cached = await cache.match(req, { ignoreVary: true });
   if (cached) return cached;
 
   try {

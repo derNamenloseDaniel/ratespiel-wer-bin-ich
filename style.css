@@ -470,6 +470,38 @@ h1 {
 }
 .cat-dl:active { opacity: 0.7; }
 
+.dl-all-btn {
+  padding: 6px 12px;
+  background: none;
+  border: 2px solid var(--accent2);
+  border-radius: 8px;
+  color: var(--text2);
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.dl-all-btn:active { opacity: 0.7; }
+.dl-all-btn[disabled] { opacity: 0.5; cursor: default; }
+
+.storage-line {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.66rem;
+  color: var(--text2);
+}
+.storage-clear {
+  background: none; border: none; padding: 0;
+  color: var(--accent); font-size: 0.66rem;
+  text-decoration: underline; cursor: pointer;
+}
+
+/* Gesperrte Auswahl: Bildmodus ohne Netz und ohne geladene Bilder */
+.mode-btn[disabled], .cat-btn[disabled] { opacity: 0.35; cursor: not-allowed; }
+.mode-btn[disabled]:hover, .cat-btn[disabled]:hover {
+  background: var(--bg2); border-color: var(--accent2); color: var(--text);
+}
+
 /* ── Offline-Anzeige ─────────────────────────────────────────────────────── */
 .offline-status {
   font-size: 0.68rem;

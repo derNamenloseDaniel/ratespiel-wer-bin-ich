@@ -46,11 +46,33 @@ function soundWrong()   { beep(200, 0.3, 'sawtooth', 0.2); }
 // Offline-Weg zu fallen – fetch() lehnt dort nicht ab, es antwortet nur nie.
 const NET_TIMEOUT = 5000;
 
-async function fetchTimed(url, ms = NET_TIMEOUT) {
-  const ctl = new AbortController();
-  const to = setTimeout(() => ctl.abort(), ms);
-  try { return await fetch(url, { signal: ctl.signal }); }
-  finally { clearTimeout(to); }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// Zusätzlich 429-fest: Wikipedia drosselt, wenn man zu schnell fragt. Ein 429
+// ist kein Netzausfall, sondern eine Bitte zu warten – wer ihn als Fehler
+// zählt, hält fälschlich das ganze Gerät für offline.
+async function fetchTimed(url, ms = NET_TIMEOUT, retries = 2) {
+  for (let i = 0; ; i++) {
+    const ctl = new AbortController();
+    const to = setTimeout(() => ctl.abort(), ms);
+    let r;
+    try { r = await fetch(url, { signal: ctl.signal }); }
+    finally { clearTimeout(to); }
+    if (r.status !== 429 || i >= retries) return r;
+    const wait = Number(r.headers.get('Retry-After')) * 1000 || 1000 * (i + 1);
+    await sleep(Math.min(wait, 5000));
+  }
+}
+
+// Holt die Bild-Bytes in den Cache. Bewusst per fetch() mit CORS statt über ein
+// <img>: ein <img> stellt eine no-cors-Anfrage, die Antwort ist "opaque" – und
+// opaque Antworten rechnet der Browser aus Datenschutzgründen mit rund 7 MB pro
+// Stück auf das Speicherkontingent an, egal wie klein das Bild wirklich ist.
+// 500 Bilder wären so über 3 GB "belegt" und der Cache flöge raus.
+// upload.wikimedia.org erlaubt CORS, also kostet uns das nichts.
+async function warmImage(url, ms = 15000) {
+  try { const r = await fetchTimed(url, ms); return r.ok; }
+  catch { return false; }
 }
 
 // Lädt ein Bild wirklich (nicht nur die URL). false = offline / nicht im Cache.
@@ -105,12 +127,41 @@ async function fetchWikiImageByTitle(title, lang) {
   return page?.thumbnail?.source || null;
 }
 
+// Eine Anfrage für bis zu 25 Begriffe statt 25 Anfragen. Ohne das läuft der
+// Vorabdownload nach ein paar hundert Wörtern in Wikipedias Rate-Limit.
+async function wikiThumbsBatch(titles, lang) {
+  const url = `https://${lang}.wikipedia.org/w/api.php?action=query&format=json&origin=*`
+            + `&prop=pageimages&pithumbsize=600&redirects=1&titles=`
+            + titles.map(encodeURIComponent).join('%7C');
+  const r = await fetchTimed(url, 15000);
+  const j = await r.json();
+  const q = j.query || {};
+
+  // Wikipedia normalisiert Titel und folgt Weiterleitungen. Der Rückweg vom
+  // gelieferten Seitentitel zum angefragten Begriff muss nachgebaut werden.
+  const current = new Map(titles.map(t => [t, t]));
+  for (const step of [q.normalized, q.redirects]) {
+    if (!step) continue;
+    const m = new Map(step.map(s => [s.from, s.to]));
+    for (const [orig, cur] of current) if (m.has(cur)) current.set(orig, m.get(cur));
+  }
+
+  const thumbs = new Map();
+  for (const p of Object.values(q.pages || {})) {
+    if (p.thumbnail?.source) thumbs.set(p.title, p.thumbnail.source);
+  }
+
+  const out = new Map();
+  for (const [orig, cur] of current) out.set(orig, thumbs.get(cur) || null);
+  return out;
+}
+
 // Wirft bei Netzproblemen, gibt null zurück wenn die API geantwortet hat,
 // es aber schlicht kein Bild gibt. Diese Unterscheidung ist wichtig: das eine
 // heißt "Karte überspringen", das andere "offline, Wort zeigen".
-async function lookupWikiImage(term) {
+async function lookupWikiImage(term, skipDirect = false) {
   const lang = S.lang === 'de' ? 'de' : 'en';
-  const direct = await fetchWikiImageByTitle(term, lang);
+  const direct = skipDirect ? null : await fetchWikiImageByTitle(term, lang);
   if (direct) return direct;
 
   const searchUrl = `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(term)}&srlimit=3&format=json&origin=*`;
@@ -125,16 +176,17 @@ async function lookupWikiImage(term) {
 }
 
 // → { url: string|null, offline: bool }
-async function resolveImage(term) {
+async function resolveImage(term, skipDirect = false) {
   const key = `${S.lang}|${term}`;
   if (key in IMG_MEMO) return { url: IMG_MEMO[key] || null, offline: false };
   if (!navigator.onLine) return { url: null, offline: true };
   try {
-    const url = await lookupWikiImage(term);
+    const url = await lookupWikiImage(term, skipDirect);
     memoSet(key, url || '');
+    noteNetSuccess();
     return { url, offline: false };
   } catch {
-    setOffline(true);
+    noteNetFailure();
     return { url: null, offline: true };
   }
 }
@@ -158,6 +210,13 @@ function setOffline(off) {
 
 function isOffline() { return _netDown || !navigator.onLine; }
 
+// Ein einzelner fehlgeschlagener Request heißt noch nicht "kein Internet" –
+// Wikipedia hat gelegentlich Aussetzer. Erst eine Serie zählt als offline,
+// jeder Erfolg setzt den Zähler zurück.
+let _failStreak = 0;
+function noteNetFailure() { if (++_failStreak >= 3) setOffline(true); }
+function noteNetSuccess() { _failStreak = 0; if (_netDown && navigator.onLine) setOffline(false); }
+
 function renderOfflineStatus() {
   const el = $('offline-status');
   if (!el) return;
@@ -165,6 +224,59 @@ function renderOfflineStatus() {
   const key = isOffline() ? 'offlineNow' : installed ? 'offlineReady' : 'offlinePrep';
   el.textContent = t(key);
   el.className = 'offline-status ' + (isOffline() ? 'off' : installed ? 'ok' : 'wait');
+  updateModeAvailability();
+  renderStorageLine();
+}
+
+// Gibt es überhaupt vorab geladene Bilder?
+function hasOfflineImages() {
+  return Object.values(catReadyMap()).some(n => n > 0);
+}
+
+// Der Bildmodus ist offline nur wählbar, wenn Bilder vorab geladen wurden –
+// sonst führt die Auswahl in eine Sackgasse. Mit geladenen Bildern bleibt er
+// offen, denn genau dafür ist der Vorabdownload da.
+function updateModeAvailability() {
+  const imgBtn = document.querySelector('.mode-btn[data-mode="image"]');
+  const wordBtn = document.querySelector('.mode-btn[data-mode="word"]');
+  if (!imgBtn) return;
+
+  const allowed = !isOffline() || hasOfflineImages();
+  imgBtn.disabled = !allowed;
+  imgBtn.title = allowed ? '' : t('imageNeedsNet');
+
+  if (!allowed && S.mode === 'image') {
+    S.mode = 'word';
+    imgBtn.classList.remove('active');
+    wordBtn.classList.add('active');
+  }
+
+  const dl = $('btn-dl-all');
+  if (dl) dl.classList.toggle('hidden', isOffline());
+}
+
+// ── Speicheranzeige ────────────────────────────────────────────────────────
+async function renderStorageLine() {
+  const line = $('storage-line');
+  if (!line || !navigator.storage?.estimate) return;
+  const { usage = 0 } = await navigator.storage.estimate();
+  const mb = usage / 1048576;
+  if (mb < 1) { line.classList.add('hidden'); return; }
+  line.classList.remove('hidden');
+  $('storage-size').textContent = `${mb.toFixed(mb < 10 ? 1 : 0)} MB ${t('storageUsed')}`;
+}
+
+async function clearOfflineImages() {
+  if (!confirm(t('clearConfirm'))) return;
+  await caches.delete('ratespiel-media');
+  IMG_MEMO = {};
+  try {
+    localStorage.removeItem(IMG_MEMO_KEY);
+    localStorage.removeItem(CAT_READY_KEY);
+  } catch {}
+  const dl = $('btn-dl-all');
+  if (dl) { dl.textContent = t('dlAll'); dl.disabled = false; }
+  renderOfflineStatus();
 }
 
 window.addEventListener('offline', () => setOffline(true));
@@ -219,10 +331,17 @@ function showCategory() {
     const cell = document.createElement('div');
     cell.className = 'cat-cell';
 
+    const have = catReadyGet(cat.id, S.lang);
+
     const btn = document.createElement('button');
     btn.className = 'cat-btn';
     btn.textContent = t(`cats.${cat.id}`);
     btn.onclick = () => { S.category = cat.id; startGame(); };
+    // Offline im Bildmodus: was nicht geladen wurde, gibt es hier auch nicht.
+    if (S.mode === 'image' && isOffline() && have === 0) {
+      btn.disabled = true;
+      btn.title = t('catNeedsDownload');
+    }
     cell.appendChild(btn);
 
     // Im Bildmodus: pro Kategorie die Bilder vorab holen, damit sie später
@@ -230,9 +349,9 @@ function showCategory() {
     if (S.mode === 'image') {
       const dl = document.createElement('button');
       dl.className = 'cat-dl';
-      const have = catReadyGet(cat.id, S.lang);
       dl.textContent = have > 0 ? `✅ ${have}` : '⬇';
       dl.title = t('prefetchHint');
+      dl.disabled = isOffline();
       dl.onclick = ev => { ev.stopPropagation(); prefetchCategory(cat, dl); };
       cell.appendChild(dl);
     }
@@ -241,35 +360,113 @@ function showCategory() {
   });
 }
 
-// Holt alle Bilder einer Kategorie ins Offline-Depot. Bricht ab, sobald das
-// Netz mehrfach nicht antwortet – sonst läuft man in lauter 5s-Timeouts.
+// Holt Bilder ins Offline-Depot. Bricht ab, sobald das Netz mehrfach nicht
+// antwortet – sonst läuft man in lauter 5-Sekunden-Timeouts.
+// onProgress bekommt einen Bruchteil 0..1. Die Bild-Bytes sind der langsame
+// Teil, also bekommt der auch den größten Teil des Balkens.
+async function prefetchWords(words, suffix, onProgress) {
+  const lang  = S.lang === 'de' ? 'de' : 'en';
+  const terms = [...new Set(words.map(w => w + suffix))];
+  const total = terms.length;
+  const key   = term => `${S.lang}|${term}`;
+  let ok = 0, failed = 0, streak = 0, aborted = false;
+
+  const note = bad => {
+    if (bad) { failed++; return ++streak; }
+    streak = 0; return 0;
+  };
+
+  // Phase 1 (0–20 %): Sammelabfrage, 25 Begriffe pro Anfrage.
+  const unknown = terms.filter(t => !(key(t) in IMG_MEMO));
+  const missedDirect = new Set();
+  for (let i = 0; i < unknown.length && !aborted; i += 25) {
+    const chunk = unknown.slice(i, i + 25);
+    try {
+      const found = await wikiThumbsBatch(chunk, lang);
+      for (const term of chunk) {
+        const url = found.get(term);
+        if (url) memoSet(key(term), url); else missedDirect.add(term);
+      }
+      noteNetSuccess(); note(false);
+    } catch {
+      noteNetFailure();
+      if (note(true) >= 3) aborted = true;
+    }
+    onProgress?.((i + chunk.length) / unknown.length * 0.2);
+  }
+
+  // Phase 2 (20–40 %): Was die Sammelabfrage nicht kannte, einzeln über die
+  // Volltextsuche – nacheinander, damit das Limit nicht doch noch reißt.
+  const rest = aborted ? [] : [...missedDirect];
+  for (let i = 0; i < rest.length && !aborted; i++) {
+    const res = await resolveImage(rest[i], true);   // direkte Abfrage war schon erfolglos
+    if (note(res.offline) >= 5) aborted = true;
+    onProgress?.(0.2 + (i + 1) / rest.length * 0.2);
+  }
+
+  // Phase 3 (40–100 %): die Bilder selbst. Die kommen vom CDN, nicht von der
+  // API – der verträgt Parallelität ohne Drosselung.
+  const urls = terms.map(t => IMG_MEMO[key(t)]).filter(Boolean);
+  const queue = urls.slice();
+  let done = 0;
+  const worker = async () => {
+    while (queue.length && !aborted) {
+      const u = queue.shift();
+      if (await warmImage(u)) { ok++; note(false); }
+      else if (note(true) >= 8) aborted = true;
+      onProgress?.(0.4 + (++done) / urls.length * 0.6);
+    }
+  };
+  await Promise.all([worker(), worker(), worker()]);
+
+  return { ok, failed, aborted, total };
+}
+
 async function prefetchCategory(cat, btn) {
   if (btn.dataset.busy) return;
   btn.dataset.busy = '1';
 
-  const words  = getWords(cat.id, S.lang);
-  const suffix = cat.imageSearchSuffix?.[S.lang] || '';
-  const queue  = words.slice();
-  const total  = words.length;
-  let done = 0, ok = 0, failed = 0, aborted = false;
+  const words = getWords(cat.id, S.lang);
+  const r = await prefetchWords(
+    words,
+    cat.imageSearchSuffix?.[S.lang] || '',
+    frac => { btn.textContent = `${Math.round(frac * 100)} %`; }
+  );
 
-  const worker = async () => {
-    while (queue.length && !aborted) {
-      const w = queue.shift();
-      const res = await resolveImage(w + suffix);
-      if (res.offline) failed++;
-      else if (res.url && await loadImage(res.url, 15000)) ok++;
-      done++;
-      btn.textContent = `${Math.round(done / total * 100)} %`;
-      if (failed > 3) aborted = true;
-    }
-  };
-
-  await Promise.all([worker(), worker(), worker()]);
-
-  catReadySet(cat.id, S.lang, ok);
+  catReadySet(cat.id, S.lang, r.ok);
   btn.dataset.busy = '';
-  btn.textContent = aborted ? `⚠ ${ok}` : `✅ ${ok}`;
+  btn.textContent = r.aborted ? `⚠ ${r.ok}` : `✅ ${r.ok}`;
+  renderOfflineStatus();
+  return r;
+}
+
+// Alle Kategorien am Stück – der Knopf auf dem Startbildschirm.
+async function prefetchAll(btn) {
+  if (btn.dataset.busy) return;
+  btn.dataset.busy = '1';
+  btn.disabled = true;
+
+  const cats = CATEGORIES.filter(c => !(c.onlyDE && S.lang === 'en'));
+  const grand = cats.reduce((n, c) => n + getWords(c.id, S.lang).length, 0);
+  let before = 0, ok = 0, aborted = false;
+
+  for (const cat of cats) {
+    const words = getWords(cat.id, S.lang);
+    const r = await prefetchWords(
+      words,
+      cat.imageSearchSuffix?.[S.lang] || '',
+      frac => { btn.textContent = `${Math.round((before + frac * words.length) / grand * 100)} %`; }
+    );
+    catReadySet(cat.id, S.lang, r.ok);
+    before += r.total;
+    ok += r.ok;
+    renderStorageLine();
+    if (r.aborted) { aborted = true; break; }
+  }
+
+  btn.dataset.busy = '';
+  btn.disabled = false;
+  btn.textContent = aborted ? `⚠ ${ok}` : t('dlAllDone');
   renderOfflineStatus();
 }
 
@@ -668,11 +865,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // Mode buttons
   document.querySelectorAll('.mode-btn').forEach(b => {
     b.addEventListener('click', () => {
+      if (b.disabled) return;
       document.querySelectorAll('.mode-btn').forEach(x => x.classList.remove('active'));
       b.classList.add('active');
       S.mode = b.dataset.mode;
     });
   });
+
+  // Bilder für offline: alles am Stück laden + Speicheranzeige
+  $('btn-dl-all').addEventListener('click', () => prefetchAll($('btn-dl-all')));
+  $('btn-storage-clear').addEventListener('click', clearOfflineImages);
 
   // Round mode buttons
   document.querySelectorAll('.round-btn').forEach(b => {
