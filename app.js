@@ -256,26 +256,59 @@ function updateModeAvailability() {
 }
 
 // ── Speicheranzeige ────────────────────────────────────────────────────────
-async function renderStorageLine() {
+// Bewusst NICHT über navigator.storage.estimate(): dessen Zahl umfasst die
+// ganze Herkunft und wird nach caches.delete() erst irgendwann nachgeführt –
+// nach dem Leeren stand dort weiter der alte Wert. Der Cache selbst weiß es
+// sofort und genau, also zählen wir dort.
+const MEDIA_CACHE = 'ratespiel-media';
+let _mediaBytes = 0;
+
+async function mediaCacheSize() {
+  if (!('caches' in window) || !(await caches.has(MEDIA_CACHE))) return 0;
+  const c = await caches.open(MEDIA_CACHE);
+  const keys = await c.keys();
+  const sizes = await Promise.all(keys.map(async k => {
+    const r = await c.match(k, { ignoreVary: true });
+    if (!r) return 0;
+    // Content-Length ist auch bei CORS-Antworten lesbar (safelisted header).
+    const len = Number(r.headers.get('content-length'));
+    return len || (await r.clone().blob()).size;
+  }));
+  return sizes.reduce((a, b) => a + b, 0);
+}
+
+// Die Größe zu zählen kostet einen Durchlauf über alle Einträge – deshalb nur
+// dann, wenn sich wirklich etwas geändert hat, nicht bei jedem Neuzeichnen.
+async function refreshStorage() {
+  _mediaBytes = await mediaCacheSize();
+  renderStorageLine();
+}
+
+function renderStorageLine() {
   const line = $('storage-line');
-  if (!line || !navigator.storage?.estimate) return;
-  const { usage = 0 } = await navigator.storage.estimate();
-  const mb = usage / 1048576;
-  if (mb < 1) { line.classList.add('hidden'); return; }
+  if (!line) return;
+  if (!_mediaBytes) {
+    line.classList.add('hidden');
+    $('storage-size').textContent = '';   // kein alter Wert, der beim nächsten Einblenden aufblitzt
+    return;
+  }
+  const mb = _mediaBytes / 1048576;
   line.classList.remove('hidden');
-  $('storage-size').textContent = `${mb.toFixed(mb < 10 ? 1 : 0)} MB ${t('storageUsed')}`;
+  $('storage-size').textContent = `${mb < 10 ? mb.toFixed(1) : Math.round(mb)} MB ${t('storageUsed')}`;
 }
 
 async function clearOfflineImages() {
   if (!confirm(t('clearConfirm'))) return;
-  await caches.delete('ratespiel-media');
+  await caches.delete(MEDIA_CACHE);
   IMG_MEMO = {};
+  clearTimeout(_memoTimer);          // sonst schreibt der Nachzügler alles zurück
   try {
     localStorage.removeItem(IMG_MEMO_KEY);
     localStorage.removeItem(CAT_READY_KEY);
   } catch {}
   const dl = $('btn-dl-all');
-  if (dl) { dl.textContent = t('dlAll'); dl.disabled = false; }
+  if (dl) { dl.textContent = t('dlAll'); dl.disabled = false; dl.dataset.busy = ''; }
+  await refreshStorage();
   renderOfflineStatus();
 }
 
@@ -436,6 +469,7 @@ async function prefetchCategory(cat, btn) {
   catReadySet(cat.id, S.lang, r.ok);
   btn.dataset.busy = '';
   btn.textContent = r.aborted ? `⚠ ${r.ok}` : `✅ ${r.ok}`;
+  await refreshStorage();
   renderOfflineStatus();
   return r;
 }
@@ -460,7 +494,7 @@ async function prefetchAll(btn) {
     catReadySet(cat.id, S.lang, r.ok);
     before += r.total;
     ok += r.ok;
-    renderStorageLine();
+    await refreshStorage();
     if (r.aborted) { aborted = true; break; }
   }
 
@@ -1053,4 +1087,5 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   showStart();
   renderAll();
+  refreshStorage();
 });

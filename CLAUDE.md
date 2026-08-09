@@ -36,6 +36,7 @@ Nie vergessen. Keine Ausnahme.
 | v2.9        | v24        | 2026-06-24 | Kalibrierungscard: Overlay "✅ Kalibriert" wenn bereits kalibriert, Klick zum Aufdecken |
 | v3.0        | v25        | 2026-08-09 | Offline-fähig: SW cache-first, Netz-Timeouts, Bild-Vorabdownload je Kategorie |
 | v3.1        | v26        | 2026-08-10 | "Bilder für offline"-Knopf (alle Kategorien) + Speicheranzeige; Bildmodus offline gesperrt, solange nichts geladen ist; Bilder per CORS-fetch statt <img> (opaque-Padding); Abbruch erst nach 5 Fehlschlägen **in Folge** |
+| v3.2        | v27        | 2026-08-10 | Speicheranzeige zählt den Media-Cache selbst statt `storage.estimate()` – nach "Leeren" stand dort weiter der alte Wert |
 
 ## Offline – die Regeln, die dabei gelernt wurden
 
@@ -64,6 +65,11 @@ Nie vergessen. Keine Ausnahme.
    Speicherkontingent an. 48 Bilder wurden so als 308 MB verbucht statt als 11 MB.
    Nötig dazu: `cache.match(req, { ignoreVary: true })`, sonst findet das `<img>` den per
    `fetch()` abgelegten Eintrag wegen abweichender `Accept`-Header nicht wieder.
+9. **`navigator.storage.estimate()` taugt nicht als Live-Anzeige.** Der Wert umfasst die ganze
+   Herkunft und wird nach `caches.delete()` erst irgendwann nachgeführt — nach dem Leeren stand
+   dort weiter der alte Wert, obwohl der Cache schon weg war. Für eine Anzeige, die auf eine
+   Nutzeraktion hin stimmen muss, die Einträge selbst summieren
+   (`Content-Length`, ersatzweise `blob().size`) und nur bei echten Änderungen neu zählen.
 
 ## Projekt-Übersicht
 

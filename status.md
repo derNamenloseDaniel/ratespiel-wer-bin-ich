@@ -1,6 +1,6 @@
 # Status – Ratespiel „Wer bin ich?"
 
-Stand: 10.08.2026 · **v3.1 ist live** auf GitHub Pages. Offen ist nur noch der Test auf echten Geräten.
+Stand: 10.08.2026 · **v3.2 ist live** auf GitHub Pages. Offen ist nur noch der Test auf echten Geräten.
 
 ## In Arbeit
 
@@ -34,6 +34,12 @@ Stand: 10.08.2026 · **v3.1 ist live** auf GitHub Pages. Offen ist nur noch der 
 
 ## Archiv
 
+- **10.08.2026 – v3.2: Speicheranzeige nach „Leeren" korrigiert.** Von Daniel gemeldet: nach dem
+  Bestätigen wurde der Bildmodus richtig gesperrt, die Zeile zeigte aber weiter „22 MB
+  offline gespeichert". Ursache war `navigator.storage.estimate()`, dessen Quota-Buchhaltung
+  nach `caches.delete()` hinterherhinkt. Jetzt wird der Media-Cache selbst summiert
+  (`Content-Length`), gezählt nur bei echten Änderungen. Nebenbei behoben: ein offener
+  Debounce-Timer hätte das gerade geleerte Bild-Gedächtnis wieder zurückgeschrieben.
 - **10.08.2026 – `AUFGABEN.md` gelöscht** (`9880737`). Ursprüngliche Bauanleitung vom Juni,
   kein Punkt je abgehakt. Stand steht in dieser Datei, Historie in `CLAUDE.md`.
 - **10.08.2026 – v3.1: Bedienung des Vorabdownloads + drei echte Fehler dabei gefunden.**
