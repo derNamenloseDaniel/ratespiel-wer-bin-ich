@@ -24,17 +24,27 @@ const S = {
 window.LANG = 'de';
 
 // ── Audio ──────────────────────────────────────────────────────────────────
-const AC = new (window.AudioContext || window.webkitAudioContext)();
+// Der AudioContext wird erst beim ersten Ton gebaut, nicht beim Laden. Sein
+// Konstruktor fährt die Audio-Hardware hoch und blockiert dabei auf dem Handy
+// spürbar – am Anfang einer synchronen <script>-Datei heißt das: der Nutzer
+// sieht so lange gar nichts. Nebeneffekt: auf iOS ist ein nach einer
+// Nutzergeste erzeugter Context ohnehin der einzige, der klingen darf.
+let AC = null;
+function audio() {
+  if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+  return AC;
+}
 
 function beep(freq, duration, type = 'sine', gain = 0.3) {
-  const osc = AC.createOscillator();
-  const g = AC.createGain();
-  osc.connect(g); g.connect(AC.destination);
+  const ac = audio();
+  const osc = ac.createOscillator();
+  const g = ac.createGain();
+  osc.connect(g); g.connect(ac.destination);
   osc.frequency.value = freq;
   osc.type = type;
-  g.gain.setValueAtTime(gain, AC.currentTime);
-  g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + duration);
-  osc.start(); osc.stop(AC.currentTime + duration);
+  g.gain.setValueAtTime(gain, ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + duration);
+  osc.start(); osc.stop(ac.currentTime + duration);
 }
 
 function soundCorrect() { beep(880, 0.15); setTimeout(() => beep(1320, 0.2), 100); }
@@ -269,12 +279,19 @@ async function mediaCacheSize() {
   const keys = await c.keys();
   const sizes = await Promise.all(keys.map(async k => {
     const r = await c.match(k, { ignoreVary: true });
-    if (!r) return 0;
-    // Content-Length ist auch bei CORS-Antworten lesbar (safelisted header).
-    const len = Number(r.headers.get('content-length'));
-    return len || (await r.clone().blob()).size;
+    // Nur der Header, bewusst kein Rückgriff auf blob(): das würde jedes Bild
+    // aus dem Speicher lesen – bei 500 Bildern zig MB, nur um eine Zahl
+    // anzuzeigen. Content-Length ist auch bei CORS-Antworten lesbar.
+    return r ? Number(r.headers.get('content-length')) || 0 : 0;
   }));
   return sizes.reduce((a, b) => a + b, 0);
+}
+
+// Läuft über alle Cache-Einträge, gehört also nie in den Startpfad.
+function refreshStorageWhenIdle() {
+  const run = () => refreshStorage();
+  if ('requestIdleCallback' in window) requestIdleCallback(run, { timeout: 3000 });
+  else setTimeout(run, 1200);
 }
 
 // Die Größe zu zählen kostet einen Durchlauf über alle Einträge – deshalb nur
@@ -1061,13 +1078,11 @@ document.addEventListener('DOMContentLoaded', () => {
     show('install-ios-hint');
   }
 
-  // Service Worker – auto-reload when a new version activates
+  // Service Worker – auto-reload when a new version activates.
+  // Die Registrierung stößt einen Netzabruf von sw.js an (Update-Prüfung).
+  // Der gehört hinter das erste Bild, nicht davor – die Seite läuft ja bereits
+  // unter dem schon registrierten Worker aus der letzten Sitzung.
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js')
-      .then(() => navigator.serviceWorker.ready)
-      .then(renderOfflineStatus)
-      .catch(console.warn);
-
     // Beim allerersten Besuch übernimmt der SW die Seite (clients.claim) –
     // das ist ein Controller-Wechsel ohne neue Version und darf kein Reload sein.
     let hadController = !!navigator.serviceWorker.controller;
@@ -1075,6 +1090,13 @@ document.addEventListener('DOMContentLoaded', () => {
       if (hadController) queueReload();
       else { hadController = true; renderOfflineStatus(); }
     });
+
+    const registerSW = () => navigator.serviceWorker.register('./sw.js')
+      .then(() => navigator.serviceWorker.ready)
+      .then(renderOfflineStatus)
+      .catch(console.warn);
+    if ('requestIdleCallback' in window) requestIdleCallback(registerSW, { timeout: 3000 });
+    else setTimeout(registerSW, 800);
   }
 
   setOffline(!navigator.onLine);
@@ -1087,5 +1109,15 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   showStart();
   renderAll();
-  refreshStorage();
+  refreshStorageWhenIdle();
+
+  // Startdauer sichtbar machen – sonst ist "gefühlt langsam" nicht messbar.
+  // Erst direkt setzen (requestAnimationFrame feuert in einem Hintergrund-Tab
+  // gar nicht), dann beim ersten echten Bild auf den genauen Wert nachziehen.
+  const bootEl = $('boot-ms');
+  if (bootEl) {
+    const stamp = () => { bootEl.textContent = `· ${Math.round(performance.now())} ms`; };
+    stamp();
+    requestAnimationFrame(() => requestAnimationFrame(stamp));
+  }
 });

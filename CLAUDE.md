@@ -37,6 +37,7 @@ Nie vergessen. Keine Ausnahme.
 | v3.0        | v25        | 2026-08-09 | Offline-fähig: SW cache-first, Netz-Timeouts, Bild-Vorabdownload je Kategorie |
 | v3.1        | v26        | 2026-08-10 | "Bilder für offline"-Knopf (alle Kategorien) + Speicheranzeige; Bildmodus offline gesperrt, solange nichts geladen ist; Bilder per CORS-fetch statt <img> (opaque-Padding); Abbruch erst nach 5 Fehlschlägen **in Folge** |
 | v3.2        | v27        | 2026-08-10 | Speicheranzeige zählt den Media-Cache selbst statt `storage.estimate()` – nach "Leeren" stand dort weiter der alte Wert |
+| v3.3        | v28        | 2026-08-10 | Startzeit: Startscreen ohne JS sichtbar, AudioContext erst beim ersten Ton, Speicherzählung und SW-Registrierung in die Leerlaufzeit, SW frischt je Datei nur einmal pro Lebensdauer auf; Startdauer am Versionslabel abzulesen |
 
 ## Offline – die Regeln, die dabei gelernt wurden
 
@@ -70,6 +71,23 @@ Nie vergessen. Keine Ausnahme.
    dort weiter der alte Wert, obwohl der Cache schon weg war. Für eine Anzeige, die auf eine
    Nutzeraktion hin stimmen muss, die Einträge selbst summieren
    (`Content-Length`, ersatzweise `blob().size`) und nur bei echten Änderungen neu zählen.
+
+## Startzeit — was gilt
+
+Der Startbildschirm steht im HTML **ohne** `hidden` da. Er muss sichtbar sein, sobald HTML und
+CSS aus dem Cache kommen, ohne auf `app.js` zu warten. Wer hier wieder ein `hidden` einbaut und
+erst per JS einblendet, macht den Start wieder von der Skriptausführung abhängig.
+
+Nichts Blockierendes vor dem ersten Bild:
+- **kein `new AudioContext()` auf Modulebene** — der Konstruktor fährt die Audio-Hardware hoch
+  und blockiert in einer synchronen `<script>`-Datei den Aufbau. Erst beim ersten Ton bauen.
+- **keine Cache-Durchläufe im Startpfad** (Speicherzählung) — `requestIdleCallback`.
+- **`serviceWorker.register()` erst im Leerlauf** — die Registrierung stößt den Netzabruf von
+  `sw.js` an; die Seite läuft ohnehin schon unter dem Worker der letzten Sitzung.
+
+Gemessen wird nicht geschätzt: das Versionslabel zeigt die Startdauer (`v3.3 · 14 ms`). Steht dort
+eine kleine Zahl, der Start fühlt sich aber trotzdem lang an, liegt es **vor** unserem Code
+(Browser-Kaltstart, Service-Worker-Start, PWA-Splash) — dann bringt Optimieren an der App nichts.
 
 ## Projekt-Übersicht
 

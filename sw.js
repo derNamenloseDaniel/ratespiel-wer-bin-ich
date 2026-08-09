@@ -7,7 +7,7 @@
 // Der catch() greift also nie oder erst nach Minuten → die App startete nicht.
 // Deshalb: Shell IMMER zuerst aus dem Cache, Netz nur noch im Hintergrund.
 
-const VERSION   = 'v27';
+const VERSION   = 'v28';
 const SHELL     = `ratespiel-shell-${VERSION}`;
 const MEDIA     = 'ratespiel-media';   // Wikipedia-Bilder/-Antworten, überlebt Versionswechsel
 // Reicht für alle elf Kategorien (~540 Bilder) mit reichlich Luft. Gezählt
@@ -67,6 +67,11 @@ self.addEventListener('fetch', e => {
   e.respondWith(shellFirst(req));
 });
 
+// Jede Datei wird pro SW-Lebensdauer höchstens einmal aufgefrischt. Ohne das
+// stößt ein Start neun Netzanfragen an – offline hängen die bis zum Timeout und
+// halten Funk und Service Worker unnötig wach.
+const revalidated = new Set();
+
 // Cache zuerst, Netz nur im Hintergrund zum Auffrischen.
 async function shellFirst(req) {
   const cache  = await caches.open(SHELL);
@@ -74,7 +79,10 @@ async function shellFirst(req) {
 
   if (cached) {
     // stale-while-revalidate: blockiert nie, aktualisiert für den nächsten Start
-    fetch(req).then(r => { if (r && r.ok) cache.put(req, r.clone()); }).catch(() => {});
+    if (navigator.onLine && !revalidated.has(req.url)) {
+      revalidated.add(req.url);
+      fetch(req).then(r => { if (r && r.ok) cache.put(req, r.clone()); }).catch(() => {});
+    }
     return cached;
   }
 

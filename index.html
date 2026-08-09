@@ -83,7 +83,11 @@
 </div>
 
 <!-- ── SCREEN: START ───────────────────────────────────────────────────── -->
-<div id="screen-start" class="screen hidden">
+<!-- Bewusst NICHT "hidden": so steht der Startbildschirm, sobald HTML und CSS da
+     sind (beides aus dem Cache = sofort), ohne auf app.js zu warten. Vorher war
+     jeder Screen versteckt und erst showStart() hat einen eingeblendet – bis
+     dahin sah man nichts als den dunklen Hintergrund. -->
+<div id="screen-start" class="screen">
   <div class="start-inner">
 
     <!-- LEFT col: title + lang + mode -->
@@ -172,7 +176,7 @@
     </div>
 
   </div>
-  <span class="version-label">v3.2</span>
+  <span class="version-label">v3.3 <span id="boot-ms"></span></span>
 </div>
 
 <!-- ── SCREEN: CATEGORY ────────────────────────────────────────────────── -->

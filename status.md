@@ -1,6 +1,6 @@
 # Status – Ratespiel „Wer bin ich?"
 
-Stand: 10.08.2026 · **v3.2 ist live** auf GitHub Pages. Offen ist nur noch der Test auf echten Geräten.
+Stand: 10.08.2026 · **v3.3 ist live** auf GitHub Pages. Offline-Test auf dem Handy bestanden.
 
 ## In Arbeit
 
@@ -16,11 +16,10 @@ Stand: 10.08.2026 · **v3.2 ist live** auf GitHub Pages. Offen ist nur noch der 
 
 ## Warten auf Feedback
 
-- **Daniel: Test auf dem echten Handy** (2 SP) — mit WLAN öffnen (unten links muss **v3.1**
-  stehen), Bildmodus wählen, „⬇ Bilder für offline" laufen lassen (~3–4 min, ~90 MB), auf
-  „✅ Offline spielbereit" warten, zum Home-Bildschirm hinzufügen, dann Flugmodus und spielen.
-  Idealerweise auf Android *und* iOS, weil Safari den Service Worker anders behandelt.
-  Der lokale Test deckt genau das nicht ab: echter Sensor, echtes Safari, echte Speichergrenzen.
+- **Daniel: Startdauer vom Handy ablesen** (1 SP) — App vom Home-Bildschirm starten, unten links
+  steht jetzt `v3.3 · <Zahl> ms`. Kleine Zahl trotz langem Warten heißt: die Zeit vergeht
+  **vor** unserem Code (Browser-Kaltstart, Service-Worker-Start, PWA-Splash) und lässt sich in
+  der App nicht wegoptimieren. Große Zahl heißt: es liegt weiter bei uns, dann weitersuchen.
 
 ## Entschieden
 
@@ -34,6 +33,14 @@ Stand: 10.08.2026 · **v3.2 ist live** auf GitHub Pages. Offen ist nur noch der 
 
 ## Archiv
 
+- **10.08.2026 – Offline-Test auf dem Handy bestanden** („klappt"). Damit ist der eigentliche
+  Anlass — das Spiel lief auf dem Fest ohne Internet nicht — erledigt.
+- **10.08.2026 – v3.3: Startpfad freigeräumt.** Größte Bremse war, dass gar nichts gerendert
+  wurde, bevor `app.js` durch war (jeder Screen stand `hidden` im HTML). Dahinter
+  `new AudioContext()` auf Modulebene, das die Audio-Hardware hochfährt und dabei blockiert.
+  Beides behoben; Speicherzählung und SW-Registrierung laufen im Leerlauf, der Service Worker
+  frischt jede Datei nur noch einmal pro Lebensdauer und nur online auf.
+  Startdauer steht jetzt am Versionslabel. Lokal: 12–14 ms, mit gestopptem Server ebenfalls 12 ms.
 - **10.08.2026 – v3.2: Speicheranzeige nach „Leeren" korrigiert.** Von Daniel gemeldet: nach dem
   Bestätigen wurde der Bildmodus richtig gesperrt, die Zeile zeigte aber weiter „22 MB
   offline gespeichert". Ursache war `navigator.storage.estimate()`, dessen Quota-Buchhaltung
