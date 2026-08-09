@@ -40,34 +40,103 @@ function beep(freq, duration, type = 'sine', gain = 0.3) {
 function soundCorrect() { beep(880, 0.15); setTimeout(() => beep(1320, 0.2), 100); }
 function soundWrong()   { beep(200, 0.3, 'sawtooth', 0.2); }
 
+// ── Netz ───────────────────────────────────────────────────────────────────
+// Jeder Netzzugriff bekommt ein hartes Zeitlimit. Ohne das hängt die App bei
+// Empfang-ohne-Daten (Fest, überlastete Zelle) minutenlang statt sofort in den
+// Offline-Weg zu fallen – fetch() lehnt dort nicht ab, es antwortet nur nie.
+const NET_TIMEOUT = 5000;
+
+async function fetchTimed(url, ms = NET_TIMEOUT) {
+  const ctl = new AbortController();
+  const to = setTimeout(() => ctl.abort(), ms);
+  try { return await fetch(url, { signal: ctl.signal }); }
+  finally { clearTimeout(to); }
+}
+
+// Lädt ein Bild wirklich (nicht nur die URL). false = offline / nicht im Cache.
+function loadImage(src, ms = NET_TIMEOUT) {
+  return new Promise(resolve => {
+    const im = new Image();
+    let done = false;
+    const finish = ok => { if (done) return; done = true; clearTimeout(to); resolve(ok); };
+    const to = setTimeout(() => { im.src = ''; finish(false); }, ms);
+    im.onload  = () => finish(true);
+    im.onerror = () => finish(false);
+    im.src = src;
+  });
+}
+
+// ── Bild-Gedächtnis ────────────────────────────────────────────────────────
+// Wort → Bild-URL (oder '' für "es gibt keins"). Liegt im localStorage, damit
+// offline gar keine API-Anfrage mehr nötig ist: die URL steht fest, die Bytes
+// liegen im Media-Cache des Service Workers.
+const IMG_MEMO_KEY = 'img_memo_v1';
+const CAT_READY_KEY = 'cat_offline_v1';
+
+let IMG_MEMO = {};
+try { IMG_MEMO = JSON.parse(localStorage.getItem(IMG_MEMO_KEY) || '{}'); } catch { IMG_MEMO = {}; }
+
+let _memoTimer = null;
+function memoSet(key, val) {
+  IMG_MEMO[key] = val;
+  clearTimeout(_memoTimer);
+  _memoTimer = setTimeout(() => {
+    try { localStorage.setItem(IMG_MEMO_KEY, JSON.stringify(IMG_MEMO)); } catch {}
+  }, 400);
+}
+
+function catReadyMap() {
+  try { return JSON.parse(localStorage.getItem(CAT_READY_KEY) || '{}'); } catch { return {}; }
+}
+function catReadySet(id, lang, count) {
+  const m = catReadyMap();
+  m[`${lang}|${id}`] = count;
+  try { localStorage.setItem(CAT_READY_KEY, JSON.stringify(m)); } catch {}
+}
+function catReadyGet(id, lang) { return catReadyMap()[`${lang}|${id}`] || 0; }
+
 // ── Wikimedia ──────────────────────────────────────────────────────────────
 async function fetchWikiImageByTitle(title, lang) {
   const url = `https://${lang}.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(title)}&prop=pageimages&format=json&pithumbsize=600&origin=*`;
-  const r = await fetch(url);
+  const r = await fetchTimed(url);
   const j = await r.json();
   const pages = j.query?.pages;
   const page = pages ? Object.values(pages)[0] : null;
   return page?.thumbnail?.source || null;
 }
 
-async function fetchWikiImage(term) {
+// Wirft bei Netzproblemen, gibt null zurück wenn die API geantwortet hat,
+// es aber schlicht kein Bild gibt. Diese Unterscheidung ist wichtig: das eine
+// heißt "Karte überspringen", das andere "offline, Wort zeigen".
+async function lookupWikiImage(term) {
   const lang = S.lang === 'de' ? 'de' : 'en';
-  try {
-    // 1. Direct title lookup
-    const direct = await fetchWikiImageByTitle(term, lang);
-    if (direct) return direct;
+  const direct = await fetchWikiImageByTitle(term, lang);
+  if (direct) return direct;
 
-    // 2. Search fallback – find the best matching article title
-    const searchUrl = `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(term)}&srlimit=3&format=json&origin=*`;
-    const sr = await fetch(searchUrl);
-    const sj = await sr.json();
-    const hits = sj.query?.search || [];
-    for (const hit of hits) {
-      const img = await fetchWikiImageByTitle(hit.title, lang);
-      if (img) return img;
-    }
-    return null;
-  } catch { return null; }
+  const searchUrl = `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(term)}&srlimit=3&format=json&origin=*`;
+  const sr = await fetchTimed(searchUrl);
+  const sj = await sr.json();
+  const hits = sj.query?.search || [];
+  for (const hit of hits) {
+    const img = await fetchWikiImageByTitle(hit.title, lang);
+    if (img) return img;
+  }
+  return null;
+}
+
+// → { url: string|null, offline: bool }
+async function resolveImage(term) {
+  const key = `${S.lang}|${term}`;
+  if (key in IMG_MEMO) return { url: IMG_MEMO[key] || null, offline: false };
+  if (!navigator.onLine) return { url: null, offline: true };
+  try {
+    const url = await lookupWikiImage(term);
+    memoSet(key, url || '');
+    return { url, offline: false };
+  } catch {
+    setOffline(true);
+    return { url: null, offline: true };
+  }
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -76,7 +145,30 @@ const show = id => $(id).classList.remove('hidden');
 const hide = id => $(id).classList.add('hidden');
 const hideAll = () => ['screen-start','screen-category','screen-game','screen-summary'].forEach(hide);
 
-function setLang(l) { S.lang = l; window.LANG = l; renderAll(); }
+function setLang(l) { S.lang = l; window.LANG = l; renderAll(); renderOfflineStatus(); }
+
+// ── Offline-Status ─────────────────────────────────────────────────────────
+let _netDown = false;
+
+function setOffline(off) {
+  _netDown = off;
+  $('offline-badge')?.classList.toggle('hidden', !off);
+  renderOfflineStatus();
+}
+
+function isOffline() { return _netDown || !navigator.onLine; }
+
+function renderOfflineStatus() {
+  const el = $('offline-status');
+  if (!el) return;
+  const installed = !!navigator.serviceWorker?.controller;
+  const key = isOffline() ? 'offlineNow' : installed ? 'offlineReady' : 'offlinePrep';
+  el.textContent = t(key);
+  el.className = 'offline-status ' + (isOffline() ? 'off' : installed ? 'ok' : 'wait');
+}
+
+window.addEventListener('offline', () => setOffline(true));
+window.addEventListener('online',  () => setOffline(false));
 
 function renderAll() {
   document.querySelectorAll('[data-i18n]').forEach(el => {
@@ -97,7 +189,9 @@ function showStart() {
   show('screen-start');
   renderAll();
   renderRoundOptions();
+  renderOfflineStatus();
   unlockLandscape();
+  applyPendingReload();
 }
 
 function renderRoundOptions() {
@@ -115,16 +209,68 @@ function showCategory() {
   hideAll();
   show('screen-category');
   renderAll();
+  $('cat-hint').classList.toggle('hidden', S.mode !== 'image');
+
   const grid = $('cat-grid');
   grid.innerHTML = '';
   CATEGORIES.forEach(cat => {
     if (cat.onlyDE && S.lang === 'en') return;
+
+    const cell = document.createElement('div');
+    cell.className = 'cat-cell';
+
     const btn = document.createElement('button');
     btn.className = 'cat-btn';
     btn.textContent = t(`cats.${cat.id}`);
     btn.onclick = () => { S.category = cat.id; startGame(); };
-    grid.appendChild(btn);
+    cell.appendChild(btn);
+
+    // Im Bildmodus: pro Kategorie die Bilder vorab holen, damit sie später
+    // auch ohne Netz da sind. Der Service Worker behält sie dauerhaft.
+    if (S.mode === 'image') {
+      const dl = document.createElement('button');
+      dl.className = 'cat-dl';
+      const have = catReadyGet(cat.id, S.lang);
+      dl.textContent = have > 0 ? `✅ ${have}` : '⬇';
+      dl.title = t('prefetchHint');
+      dl.onclick = ev => { ev.stopPropagation(); prefetchCategory(cat, dl); };
+      cell.appendChild(dl);
+    }
+
+    grid.appendChild(cell);
   });
+}
+
+// Holt alle Bilder einer Kategorie ins Offline-Depot. Bricht ab, sobald das
+// Netz mehrfach nicht antwortet – sonst läuft man in lauter 5s-Timeouts.
+async function prefetchCategory(cat, btn) {
+  if (btn.dataset.busy) return;
+  btn.dataset.busy = '1';
+
+  const words  = getWords(cat.id, S.lang);
+  const suffix = cat.imageSearchSuffix?.[S.lang] || '';
+  const queue  = words.slice();
+  const total  = words.length;
+  let done = 0, ok = 0, failed = 0, aborted = false;
+
+  const worker = async () => {
+    while (queue.length && !aborted) {
+      const w = queue.shift();
+      const res = await resolveImage(w + suffix);
+      if (res.offline) failed++;
+      else if (res.url && await loadImage(res.url, 15000)) ok++;
+      done++;
+      btn.textContent = `${Math.round(done / total * 100)} %`;
+      if (failed > 3) aborted = true;
+    }
+  };
+
+  await Promise.all([worker(), worker(), worker()]);
+
+  catReadySet(cat.id, S.lang, ok);
+  btn.dataset.busy = '';
+  btn.textContent = aborted ? `⚠ ${ok}` : `✅ ${ok}`;
+  renderOfflineStatus();
 }
 
 // ── Screen: Game ──────────────────────────────────────────────────────────
@@ -156,7 +302,12 @@ async function startGame() {
   calibrateTilt();
 }
 
-async function showCard() {
+function searchTermFor(word) {
+  const cat = CATEGORIES.find(c => c.id === S.category);
+  return word + (cat?.imageSearchSuffix?.[S.lang] || '');
+}
+
+async function showCard(skips = 0) {
   if (S.index >= S.deck.length) { endGame(); return; }
   const word = S.deck[S.index];
   $('card-word').textContent = '';
@@ -166,22 +317,32 @@ async function showCard() {
 
   if (S.mode === 'image') {
     $('card-word').textContent = t('loading');
-    const cat = CATEGORIES.find(c => c.id === S.category);
-    const searchTerm = word + (cat?.imageSearchSuffix?.[S.lang] || '');
-    const img = await fetchWikiImage(searchTerm);
-    if (img) {
-      $('card-image').src = img;
+    const res = await resolveImage(searchTermFor(word));
+    const ok  = res.url ? await loadImage(res.url) : false;
+
+    if (ok) {
+      $('card-image').src = res.url;
       $('card-image').classList.remove('hidden');
       $('card-word').classList.add('hidden');
-    } else {
-      // no image found → silently skip this card
+      // nächste Karte vorbereiten (nur wenn Netz da ist)
+      const next = S.deck[S.index + 1];
+      if (next && navigator.onLine) resolveImage(searchTermFor(next));
+    } else if (res.offline || res.url) {
+      // Netzproblem: entweder kam die URL gar nicht erst, oder sie ist bekannt,
+      // die Bytes fehlen aber im Cache. In beiden Fällen: Wort zeigen, statt
+      // die Runde zu killen. (Vorher wurde hier übersprungen – offline hieß das:
+      // das ganze Deck rast in Sekunden durch und das Spiel endet sofort.)
+      setOffline(true);
+      $('card-word').textContent = word;
+    } else if (skips < 12) {
+      // Online, aber zu diesem Begriff gibt es wirklich kein Bild → überspringen
       S.index++;
       if (S.index >= S.deck.length) { endGame(); return; }
-      await showCard();
+      await showCard(skips + 1);
       return;
+    } else {
+      $('card-word').textContent = word;
     }
-    // preload next
-    if (S.deck[S.index + 1]) fetchWikiImage(S.deck[S.index + 1]);
   } else {
     $('card-word').textContent = word;
   }
@@ -463,6 +624,24 @@ window.addEventListener('beforeinstallprompt', e => {
   }
 });
 
+// ── Update-Reload ──────────────────────────────────────────────────────────
+// Neue Version = Neuladen. Aber nie mitten in einer laufenden Runde – das hat
+// im Spiel den Punktestand gekostet. Stattdessen bis zum Startscreen warten.
+let _reloadPending = false;
+
+function queueReload() {
+  _reloadPending = true;
+  applyPendingReload();
+}
+
+function applyPendingReload() {
+  if (!_reloadPending) return;
+  const inGame = !$('screen-game').classList.contains('hidden');
+  if (inGame) return;
+  _reloadPending = false;
+  window.location.reload();
+}
+
 // ── Init ───────────────────────────────────────────────────────────────────
 async function lockLandscape() {
   try {
@@ -648,19 +827,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Service Worker – auto-reload when a new version activates
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').then(reg => {
-      reg.addEventListener('updatefound', () => {
-        reg.installing?.addEventListener('statechange', e => {
-          if (e.target.state === 'activated') window.location.reload();
-        });
-      });
-    }).catch(console.warn);
+    navigator.serviceWorker.register('./sw.js')
+      .then(() => navigator.serviceWorker.ready)
+      .then(renderOfflineStatus)
+      .catch(console.warn);
 
-    // Also catches the case where skipWaiting fired before we registered the listener
+    // Beim allerersten Besuch übernimmt der SW die Seite (clients.claim) –
+    // das ist ein Controller-Wechsel ohne neue Version und darf kein Reload sein.
+    let hadController = !!navigator.serviceWorker.controller;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      window.location.reload();
+      if (hadController) queueReload();
+      else { hadController = true; renderOfflineStatus(); }
     });
   }
+
+  setOffline(!navigator.onLine);
 
   loadCalib();
   if (localStorage.getItem('tilt_calib')) {

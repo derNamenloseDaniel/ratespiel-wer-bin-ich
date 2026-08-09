@@ -1,29 +1,109 @@
-const CACHE = 'ratespiel-v24';
-const ASSETS = ['./', './index.html', './style.css', './app.js', './i18n.js', './data.js', './manifest.json'];
+// ── Service Worker: offline-first ───────────────────────────────────────────
+//
+// WICHTIG (Lehre vom Fest, 09.08.2026): Die App lief hier vorher "network-first" –
+// jeder Request ging erst ins Netz, Cache war nur der Fallback im catch().
+// Auf einem Fest mit Funkempfang, aber ohne nutzbare Datenverbindung schlägt
+// fetch() nicht fehl, sondern hängt (kein DNS, kein RST – einfach Stille).
+// Der catch() greift also nie oder erst nach Minuten → die App startete nicht.
+// Deshalb: Shell IMMER zuerst aus dem Cache, Netz nur noch im Hintergrund.
 
+const VERSION   = 'v25';
+const SHELL     = `ratespiel-shell-${VERSION}`;
+const MEDIA     = 'ratespiel-media';   // Wikipedia-Bilder/-Antworten, überlebt Versionswechsel
+const MEDIA_MAX = 900;                 // grobe Obergrenze an Einträgen
+
+const ASSETS = [
+  './', './index.html', './style.css', './app.js', './i18n.js', './data.js',
+  './manifest.json', './icons/icon-192.png', './icons/icon-512.png',
+];
+
+const isMedia = url => /(^|\.)wiki(p|m)edia\.org$/.test(url.hostname);
+
+// ── Install ────────────────────────────────────────────────────────────────
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
-  self.skipWaiting();
+  e.waitUntil((async () => {
+    const c = await caches.open(SHELL);
+    // Einzeln statt addAll(): eine einzige fehlende Datei darf nicht die
+    // komplette Offline-Fähigkeit verhindern (addAll ist all-or-nothing).
+    await Promise.all(ASSETS.map(a =>
+      c.add(new Request(a, { cache: 'reload' })).catch(() => {})
+    ));
+    self.skipWaiting();
+  })());
 });
 
+// ── Activate ───────────────────────────────────────────────────────────────
 self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
-  );
-  self.clients.claim();
+  e.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys
+      .filter(k => k !== SHELL && k !== MEDIA)
+      .map(k => caches.delete(k)));
+    await self.clients.claim();
+  })());
 });
 
+// ── Fetch ──────────────────────────────────────────────────────────────────
 self.addEventListener('fetch', e => {
-  if (e.request.url.includes('wikipedia.org')) return;
+  const req = e.request;
+  if (req.method !== 'GET') return;
 
-  // Network-first for app files so updates land immediately
-  e.respondWith(
-    fetch(e.request)
-      .then(r => {
-        const clone = r.clone();
-        caches.open(CACHE).then(c => c.put(e.request, clone));
-        return r;
-      })
-      .catch(() => caches.match(e.request))
-  );
+  const url = new URL(req.url);
+
+  if (isMedia(url)) { e.respondWith(mediaFirst(req)); return; }
+  if (url.origin !== location.origin) return;          // Fremdes: Browser macht das
+  if (url.pathname.endsWith('/sw.js')) return;         // SW-Update nie aus dem Cache
+
+  e.respondWith(shellFirst(req));
 });
+
+// Cache zuerst, Netz nur im Hintergrund zum Auffrischen.
+async function shellFirst(req) {
+  const cache  = await caches.open(SHELL);
+  const cached = await cache.match(req);
+
+  if (cached) {
+    // stale-while-revalidate: blockiert nie, aktualisiert für den nächsten Start
+    fetch(req).then(r => { if (r && r.ok) cache.put(req, r.clone()); }).catch(() => {});
+    return cached;
+  }
+
+  try {
+    const r = await fetch(req);
+    if (r && r.ok) cache.put(req, r.clone());
+    return r;
+  } catch {
+    // Offline und nichts im Cache: Navigation trotzdem auf die App lenken,
+    // statt die Browser-Fehlerseite zu zeigen.
+    if (req.mode === 'navigate') {
+      const fallback = await cache.match('./index.html') || await cache.match('./');
+      if (fallback) return fallback;
+    }
+    return new Response('', { status: 503, statusText: 'offline' });
+  }
+}
+
+// Wikipedia: einmal geholt = für immer offline verfügbar.
+async function mediaFirst(req) {
+  const cache  = await caches.open(MEDIA);
+  const cached = await cache.match(req);
+  if (cached) return cached;
+
+  try {
+    const r = await fetch(req);
+    // opaque (no-cors-Bilder) haben status 0 – die wollen wir trotzdem behalten
+    if (r && (r.ok || r.type === 'opaque')) {
+      cache.put(req, r.clone()).then(() => trim(cache));
+    }
+    return r;
+  } catch {
+    return new Response('', { status: 503, statusText: 'offline' });
+  }
+}
+
+async function trim(cache) {
+  const keys = await cache.keys();
+  if (keys.length <= MEDIA_MAX) return;
+  // keys() liefert Einfügereihenfolge → die ältesten fliegen zuerst
+  await Promise.all(keys.slice(0, keys.length - MEDIA_MAX).map(k => cache.delete(k)));
+}

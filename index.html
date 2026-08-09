@@ -121,6 +121,8 @@
         <p data-i18n="sensorHint">Bewegungssensor wird benötigt.</p>
         <button id="btn-sensor" class="btn-secondary" data-i18n="sensorBtn">Sensor erlauben</button>
       </div>
+
+      <div id="offline-status" class="offline-status wait">Wird für offline vorbereitet…</div>
     </div>
 
     <!-- RIGHT col: round mode + sub-options + start -->
@@ -165,7 +167,7 @@
     </div>
 
   </div>
-  <span class="version-label">v2.9</span>
+  <span class="version-label">v3.0</span>
 </div>
 
 <!-- ── SCREEN: CATEGORY ────────────────────────────────────────────────── -->
@@ -174,6 +176,7 @@
     <button id="btn-back-from-category" class="btn-back" data-i18n="back">← Zurück</button>
     <h2 data-i18n="selectCategory">Kategorie wählen</h2>
   </div>
+  <p id="cat-hint" class="cat-hint hidden" data-i18n="prefetchHint">⬇ lädt alle Bilder einer Kategorie herunter – danach läuft sie auch ohne Internet.</p>
   <div id="cat-grid" class="cat-grid"></div>
 </div>
 
@@ -186,6 +189,7 @@
     <span id="score-text" class="hud-score">0</span>
     <span id="timer-display" class="hud-timer hidden"></span>
     <span id="progress-text" class="hud-progress"></span>
+    <span id="offline-badge" class="hud-offline hidden">📴</span>
     <button id="btn-end-game" class="btn-end" data-i18n="endGame">Beenden</button>
   </div>
 

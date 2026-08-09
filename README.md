@@ -16,11 +16,24 @@ Ein mobiles Heads-Up-Ratespiel für Gruppen — als Progressive Web App, direkt 
 ## Features
 
 - **11 Kategorien:** Personen, Berufe, Verben, Früchte, Gemüse, Essen, Getränke, Marken, Orte, Länder, Deutsche Städte
-- **Bildmodus:** Zeigt Wikipedia-Bilder statt Text (netzwerkabhängig)
+- **Bildmodus:** Zeigt Wikipedia-Bilder statt Text — pro Kategorie per ⬇ vorab herunterladbar
 - **3 Rundenmodi:** Endlos (mit hochzählendem Timer), Zeitlimit, feste Kartenzahl
 - **Kalibrierung:** Geführter Wizard speichert die Kipprichtung in localStorage — einmalig, bleibt erhalten
 - **Zweisprachig:** Deutsch & Englisch (i18n via `i18n.js`)
-- **PWA:** Installierbar auf iOS & Android, funktioniert offline
+- **PWA:** Installierbar auf iOS & Android — läuft komplett ohne Internet
+
+## Offline
+
+Ein einziger Besuch mit Internet genügt, danach startet die App auch im Funkloch:
+
+- Der **Wortmodus** braucht überhaupt kein Netz — alle Begriffe stecken in `data.js`.
+- Der **Bildmodus** braucht die Bilder vorab: auf dem Kategorie-Bildschirm zeigt jede Kategorie
+  ein **⬇**. Antippen lädt alle Bilder dieser Kategorie dauerhaft aufs Gerät (✅ + Anzahl).
+  Fehlt später ein Bild, zeigt die Karte das Wort statt die Runde abzubrechen.
+- Auf dem Startbildschirm steht, woran man ist: *Offline spielbereit* / *wird vorbereitet* / *offline*.
+
+**Vor dem Fest also:** einmal mit WLAN öffnen, gewünschte Kategorien mit ⬇ laden, auf „✅ Offline
+spielbereit" warten. Am besten zusätzlich als App zum Home-Bildschirm hinzufügen.
 
 ## Stack
 
@@ -28,8 +41,8 @@ Ein mobiles Heads-Up-Ratespiel für Gruppen — als Progressive Web App, direkt 
 |---|---|
 | Frontend | Vanilla HTML / CSS / JS — kein Framework |
 | Hosting | GitHub Pages |
-| Bilder | Wikimedia Commons API (network-first) |
-| Offline | Service Worker mit Cache-Busting bei jedem Deploy |
+| Bilder | Wikimedia Commons API, dauerhaft im Media-Cache des Service Workers |
+| Offline | Service Worker, cache-first + stale-while-revalidate |
 | Tilt | `devicemotion` → `accelerationIncludingGravity` (kein Gimbal Lock) |
 
 ## Lokale Entwicklung
@@ -54,7 +67,7 @@ app.js          Komplette Spiellogik, Kalibrierung, Tilt-Erkennung
 style.css       Styling (CSS-Variablen, Dark Theme)
 data.js         Alle Wortlisten nach Kategorie und Sprache
 i18n.js         Übersetzungen DE/EN
-sw.js           Service Worker (network-first, Cache-Busting)
+sw.js           Service Worker (cache-first Shell + dauerhafter Media-Cache)
 manifest.json   PWA-Manifest (fullscreen landscape)
 discord/        GitHub Actions Discord-Notifications
 icons/          App-Icons (192×192, 512×512)

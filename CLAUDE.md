@@ -34,6 +34,22 @@ Nie vergessen. Keine Ausnahme.
 | v2.7        | v22        | 2026-06-24 | Rotation-Lock + Auto-Start Button versteckt (hidden); Startbutton wieder "Starten" |
 | v2.8        | v23        | 2026-06-24 | Endlos-Modus: hochzählender Timer (MM:SS) im Spielbildschirm |
 | v2.9        | v24        | 2026-06-24 | Kalibrierungscard: Overlay "✅ Kalibriert" wenn bereits kalibriert, Klick zum Aufdecken |
+| v3.0        | v25        | 2026-08-09 | Offline-fähig: SW cache-first, Netz-Timeouts, Bild-Vorabdownload je Kategorie |
+
+## Offline – die Regeln, die dabei gelernt wurden
+
+1. **Niemals network-first für die Shell.** Ohne Datenverbindung *hängt* `fetch()` auf dem Handy
+   oft einfach, statt abzulehnen — der `catch()`-Zweig mit dem Cache-Fallback greift dann nie.
+   Genau daran ist die App auf einem Fest gestorben. Shell wird cache-first ausgeliefert,
+   das Netz aktualisiert nur im Hintergrund (stale-while-revalidate).
+2. **`navigator.onLine` ist kein Beweis für Internet.** Der Wert ist `true`, sobald irgendein
+   Netzwerk anliegt. Jeder Netzzugriff braucht zusätzlich ein eigenes Zeitlimit
+   (`AbortController`, hier 5 s).
+3. **`caches.match()` kann `undefined` liefern** — das an `respondWith()` weiterzureichen erzeugt
+   einen harten Netzwerkfehler. Immer eine echte `Response` zurückgeben.
+4. **`cache.addAll()` ist all-or-nothing:** eine einzige fehlende Datei verhindert die komplette
+   Offline-Fähigkeit. Deshalb einzeln `add()` mit `catch`.
+5. **Kein Reload mitten im Spiel.** Ein SW-Update darf erst auf dem Startscreen neu laden.
 
 ## Projekt-Übersicht
 

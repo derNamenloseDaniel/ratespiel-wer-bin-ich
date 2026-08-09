@@ -39,6 +39,10 @@ const TRANSLATIONS = {
     loading: 'Lädt…',
     noImage: 'Kein Bild gefunden',
     timerEnd: 'Zeit abgelaufen!',
+    offlineReady: '✅ Offline spielbereit',
+    offlinePrep: '⏳ Wird für offline vorbereitet…',
+    offlineNow: '📴 Offline – Wortmodus läuft',
+    prefetchHint: '⬇ lädt alle Bilder einer Kategorie herunter – danach läuft sie auch ohne Internet.',
     cats: {
       persons: 'Berühmte Personen',
       jobs: 'Berufe',
@@ -93,6 +97,10 @@ const TRANSLATIONS = {
     loading: 'Loading…',
     noImage: 'No image found',
     timerEnd: 'Time\'s up!',
+    offlineReady: '✅ Ready to play offline',
+    offlinePrep: '⏳ Preparing offline mode…',
+    offlineNow: '📴 Offline – word mode works',
+    prefetchHint: '⬇ downloads all images of a category – it then works without internet.',
     cats: {
       persons: 'Famous People',
       jobs: 'Professions',

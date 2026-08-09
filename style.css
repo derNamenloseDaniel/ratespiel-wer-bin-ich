@@ -428,7 +428,18 @@ h1 {
   align-content: start;
 }
 
+.cat-hint {
+  font-size: 0.7rem;
+  color: var(--text2);
+  padding: 0 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.cat-cell { position: relative; display: flex; }
+
 .cat-btn {
+  flex: 1;
   padding: 16px 10px;
   background: var(--bg2);
   border: 2px solid var(--accent2);
@@ -441,6 +452,37 @@ h1 {
   transition: all 0.15s;
 }
 .cat-btn:active, .cat-btn:hover { border-color: var(--accent); background: var(--accent); color: #fff; }
+
+.cat-dl {
+  position: absolute;
+  top: 4px; right: 4px;
+  padding: 3px 7px;
+  min-width: 28px;
+  background: var(--accent2);
+  border: none;
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.cat-dl:active { opacity: 0.7; }
+
+/* ── Offline-Anzeige ─────────────────────────────────────────────────────── */
+.offline-status {
+  font-size: 0.68rem;
+  padding: 3px 9px;
+  border-radius: 999px;
+  align-self: flex-start;
+  border: 1px solid transparent;
+}
+.offline-status.ok   { color: var(--green); border-color: color-mix(in srgb, var(--green) 40%, transparent); }
+.offline-status.wait { color: var(--text2); border-color: color-mix(in srgb, var(--text2) 30%, transparent); }
+.offline-status.off  { color: #f1c40f; border-color: color-mix(in srgb, #f1c40f 40%, transparent); }
+
+.hud-offline { font-size: var(--fs-sm); opacity: 0.85; flex-shrink: 0; }
 
 /* ── Game Screen ─────────────────────────────────────────────────────────── */
 #screen-game {
