@@ -1,6 +1,6 @@
 # Status – Ratespiel „Wer bin ich?"
 
-Stand: 10.08.2026 · **v3.5 ist live** auf GitHub Pages. Offline-Test auf dem Handy bestanden.
+Stand: 10.08.2026 · **v3.6 ist live** auf GitHub Pages. Offline-Test auf dem Handy bestanden.
 
 ## In Arbeit
 
@@ -20,7 +20,7 @@ Stand: 10.08.2026 · **v3.5 ist live** auf GitHub Pages. Offline-Test auf dem Ha
   steht jetzt „📲 Als App installieren". Falls Chrome keinen Dialog anbietet, zeigt der Knopf die
   Anleitung über das ⋮-Menü.
 - **Daniel: Startdauer vom Handy ablesen** (1 SP) — App vom Home-Bildschirm starten, in der
-  Fußzeile steht `v3.5 · <Zahl> ms`. Kleine Zahl trotz langem Warten heißt: die Zeit vergeht
+  Fußzeile steht `v3.6 · <Zahl> ms`. Kleine Zahl trotz langem Warten heißt: die Zeit vergeht
   **vor** unserem Code (Browser-Kaltstart, Service-Worker-Start, PWA-Splash) und lässt sich in
   der App nicht wegoptimieren. Große Zahl heißt: es liegt weiter bei uns, dann weitersuchen.
 

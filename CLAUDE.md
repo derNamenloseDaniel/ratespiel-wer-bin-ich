@@ -40,6 +40,7 @@ Nie vergessen. Keine Ausnahme.
 | v3.3        | v28        | 2026-08-10 | Startzeit: Startscreen ohne JS sichtbar, AudioContext erst beim ersten Ton, Speicherzählung und SW-Registrierung in die Leerlaufzeit, SW frischt je Datei nur einmal pro Lebensdauer auf; Startdauer am Versionslabel abzulesen |
 | v3.4        | v29        | 2026-08-10 | SW-Registrierung wieder sofort (v3.3 hat damit die Installierbarkeit zerschossen); dauerhafter „Als App installieren"-Knopf mit Anleitung, wenn der Browser kein `beforeinstallprompt` schickt |
 | v3.5        | v31        | 2026-08-10 | Startbildschirm neu aufgeteilt: kein Scrollen, Ränder ringsum, Sprachauswahl als Aufklappmenü rechts vom Titel, Maße an der Viewport-Höhe; SW frischt am HTTP-Cache vorbei auf |
+| v3.6        | v32        | 2026-08-10 | `100dvh` statt `100vh` — auf Android Chrome lag der untere Streifen samt Fußzeile und Installations-Knopf hinter der Adressleiste |
 
 ## Offline – die Regeln, die dabei gelernt wurden
 
@@ -100,6 +101,13 @@ mehr und die App ließ sich nicht mehr installieren. Der Zeitgewinn war ohnehin 
 
 Das Spiel läuft im Querformat, oft mit sichtbarer Browserleiste — dort bleiben teils nur ~320 px
 Höhe. Regeln, damit nichts unter der Kante verschwindet:
+
+- **`100vh` ist auf Android Chrome zu groß.** Der Wert meint die Höhe *ohne* Adressleiste. Weil
+  die Seite nicht scrollt, klappt die Leiste nie weg — der unterste Streifen bleibt dauerhaft
+  verdeckt, und genau dort lag die Fußzeile mit dem Installations-Knopf. Überall
+  `height: 100vh; height: 100dvh;` schreiben (auch bei `position: fixed; inset: 0`, die
+  Overlays sind genauso betroffen). Im Browser-Pane ist der Fehler **nicht** reproduzierbar,
+  weil es dort keine einklappbare Adressleiste gibt — er zeigt sich nur auf dem echten Gerät.
 
 - **Nicht scrollen.** Kein `overflow-y: auto` auf den Spalten. Was nicht passt, muss kleiner
   werden, nicht wegrutschen.
