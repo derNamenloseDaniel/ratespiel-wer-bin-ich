@@ -1,6 +1,6 @@
 # Status – Ratespiel „Wer bin ich?"
 
-Stand: 10.08.2026 · **v3.8 ist live** auf GitHub Pages. Offline-Test auf dem Handy bestanden.
+Stand: 10.08.2026 · **v3.9 ist live** auf GitHub Pages. Offline-Test auf dem Handy bestanden.
 
 ## In Arbeit
 
@@ -16,15 +16,16 @@ Stand: 10.08.2026 · **v3.8 ist live** auf GitHub Pages. Offline-Test auf dem Ha
 
 ## Warten auf Feedback
 
-- **Daniel: App neu installieren** (1 SP) — Seite im Browser öffnen, unten links in der Fußzeile
-  steht jetzt „📲 Als App installieren". Falls Chrome keinen Dialog anbietet, zeigt der Knopf die
-  Anleitung über das ⋮-Menü.
-- **Daniel: Startdauer vom Handy ablesen** (1 SP) — App vom Home-Bildschirm starten, in der
-  Fußzeile steht `v3.8 · <Zahl> ms`. Kleine Zahl trotz langem Warten heißt: die Zeit vergeht
-  **vor** unserem Code (Browser-Kaltstart, Service-Worker-Start, PWA-Splash) und lässt sich in
-  der App nicht wegoptimieren. Große Zahl heißt: es liegt weiter bei uns, dann weitersuchen.
+- **Daniel: App aus der App-Übersicht holen oder dort deinstallieren** (1 SP) — der Browser meldet
+  sie als installiert, deshalb bietet er das Installieren nicht an. Entweder liegt sie einfach
+  schon da (dann Symbol zurück auf den Startbildschirm ziehen), oder erst über
+  Einstellungen → Apps → Ratespiel deinstallieren, dann geht auch das Installieren wieder.
 
 ## Entschieden
+
+- **Startzeit** (10.08.2026): erledigt. Das Versionslabel zeigt auf Daniels Gerät `81–100 ms`.
+  Die gefühlten 10–30 Sekunden entstehen also vor unserem Code (Browser-Kaltstart, PWA-Splash)
+  und lassen sich in der App nicht wegoptimieren.
 
 - **Bildmodus offline** (bestätigt 10.08.2026): gesperrt nur dann, wenn *keine* Bilder geladen
   sind. Mit vorab geladenen Bildern bleibt er offen. Kurzform: online herunterladen, offline
@@ -38,6 +39,13 @@ Stand: 10.08.2026 · **v3.8 ist live** auf GitHub Pages. Offline-Test auf dem Ha
 
 - **10.08.2026 – Offline-Test auf dem Handy bestanden** („klappt"). Damit ist der eigentliche
   Anlass — das Spiel lief auf dem Fest ohne Internet nicht — erledigt.
+- **10.08.2026 – v3.9: Dialoge laufen nicht mehr über.** Von Daniel gemeldet: Install-Dialog zu
+  groß, oben und unten abgeschnitten, kein Scrollen möglich. Feste Maße ohne `max-height` — eine
+  zentrierte, zu hohe Box ragt über beide Kanten. Jetzt alle Maße in `vh`, `max-height: 100%`
+  und `overflow-y: auto`. Gilt für Installation, Kalibrierung und Sensor-Debug.
+  Bei 915×320 passen alle drei ohne Scrollen; bei 740×200 scrollen sie, bleiben aber im Bild.
+- **10.08.2026 – Bestätigt: die App ist auf Daniels Handy noch installiert.** Die
+  `getInstalledRelatedApps`-Erkennung aus v3.8 greift und zeigt „Schon installiert".
 - **10.08.2026 – v3.8: Installations-Sackgasse erklärt statt Anleitung ins Leere.** Wunsch war ein
   echter Installations-Knopf; das ist technisch unmöglich (nur `beforeinstallprompt`, Safari hat
   gar nichts). Der wahrscheinliche Grund für das fehlende Ereignis: die App gilt noch als

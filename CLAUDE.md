@@ -42,6 +42,7 @@ Nie vergessen. Keine Ausnahme.
 | v3.5        | v31        | 2026-08-10 | Startbildschirm neu aufgeteilt: kein Scrollen, Ränder ringsum, Sprachauswahl als Aufklappmenü rechts vom Titel, Maße an der Viewport-Höhe; SW frischt am HTTP-Cache vorbei auf |
 | v3.6        | v32        | 2026-08-10 | `100dvh` statt `100vh` — auf Android Chrome lag der untere Streifen samt Fußzeile und Installations-Knopf hinter der Adressleiste |
 | v3.8        | v34        | 2026-08-10 | Erkennt über `getInstalledRelatedApps`, ob die App noch installiert ist, und sagt das statt eine nutzlose Anleitung zu zeigen; `requestFullscreen`-Ablehnung abgefangen |
+| v3.9        | v35        | 2026-08-10 | Dialoge passen sich der Höhe an (`max-height: 100%`, Maße in `vh`); reicht es nicht, scrollt der Inhalt statt über den Rand zu laufen |
 
 ## Offline – die Regeln, die dabei gelernt wurden
 
@@ -125,6 +126,15 @@ Höhe. Regeln, damit nichts unter der Kante verschwindet:
 Nach jeder Layout-Änderung gegenprüfen: bei 740×280, 915×320 und 915×412 darf
 `scrollHeight - clientHeight` beider Spalten **0** sein und kein Element außerhalb des Viewports
 liegen.
+
+**Dialoge (`.install-box`, `.calib-box`) folgen derselben Reihenfolge: erst schrumpfen, dann
+scrollen, niemals überlaufen.** Konkret: alle Maße in `vh`-`clamp`s, dazu `max-height: 100%` und
+`overflow-y: auto` auf der Box. Ohne `max-height` steht eine zentrierte Box, die zu hoch ist, über
+*beide* Kanten hinaus — oben war dann die Überschrift abgeschnitten und unten der Knopf weg.
+Weil global alle Scrollbalken ausgeblendet sind, holen die Dialoge sich ihren per
+`scrollbar-width: thin` zurück; sonst sieht niemand, dass es weitergeht.
+Prüfmaß: bei 915×320 muss jeder Dialog **ohne** Scrollen passen, bei 740×200 darf er scrollen,
+muss aber vollständig im Bild liegen und der unterste Knopf erreichbar sein.
 
 ## Installation muss ohne `beforeinstallprompt` funktionieren
 

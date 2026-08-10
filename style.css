@@ -52,51 +52,77 @@ html, body {
   height: 100vh; height: 100dvh;
   background: rgba(0,0,0,0.75);
   display: flex; align-items: center; justify-content: center;
-  padding: 20px;
+  padding: clamp(8px, 2.5vh, 20px);
 }
 
+/* Erst schrumpfen, dann scrollen: alle Maße hängen an der Viewport-Höhe, damit
+   der Dialog im Querformat normalerweise ganz hineinpasst. `max-height: 100%`
+   sorgt dafür, dass er im Zweifel trotzdem nie über den Rand hinausragt –
+   vorher stand er zentriert über beide Kanten hinaus und war oben abgeschnitten. */
 .install-box {
   background: var(--bg2);
   border: 2px solid var(--accent2);
   border-radius: 20px;
-  padding: 28px 24px;
-  max-width: 380px;
+  padding: clamp(12px, 3.5vh, 28px) clamp(14px, 3vw, 24px);
+  max-width: min(420px, 100%);
+  max-height: 100%;
   width: 100%;
   display: flex; flex-direction: column;
-  align-items: center; gap: 14px;
+  align-items: center; gap: clamp(6px, 1.8vh, 14px);
   text-align: center;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
-.install-icon { font-size: 3rem; }
+.install-icon { font-size: clamp(1.4rem, 7vh, 3rem); line-height: 1; }
 
 .install-box h2 {
-  font-size: clamp(1.2rem, 4vw, 1.6rem);
+  font-size: clamp(1rem, 4.5vh, 1.6rem);
   color: var(--accent);
 }
 
 .install-box p {
-  font-size: var(--fs-md);
+  font-size: clamp(0.75rem, 2.8vh, var(--fs-md));
   color: var(--text2);
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 .install-ios-hint {
   background: var(--bg);
   border-radius: var(--radius);
-  padding: 12px 16px;
-  font-size: var(--fs-sm);
+  padding: clamp(8px, 2vh, 12px) 14px;
+  font-size: clamp(0.7rem, 2.4vh, var(--fs-sm));
   color: var(--text2);
-  line-height: 1.6;
+  line-height: 1.45;
   width: 100%;
+}
+
+/* Muss der Inhalt doch scrollen, soll man das auch sehen können –
+   die globale Scrollbalken-Ausblendung gilt hier nicht. */
+.install-box, .calib-box { scrollbar-width: thin; }
+.install-box::-webkit-scrollbar, .calib-box::-webkit-scrollbar {
+  display: block; width: 4px;
+}
+.install-box::-webkit-scrollbar-thumb, .calib-box::-webkit-scrollbar-thumb {
+  background: var(--accent2); border-radius: 4px;
 }
 
 .install-btns {
   display: flex; flex-direction: column;
-  gap: 10px; width: 100%;
+  gap: clamp(6px, 1.5vh, 10px); width: 100%;
+  flex-shrink: 0;
 }
 
 .install-btns .btn-primary  { align-self: stretch; text-align: center; }
 .install-btns .btn-secondary { align-self: stretch; text-align: center; }
+
+/* Knöpfe in Dialogen schrumpfen mit, sonst fressen sie auf niedrigen
+   Bildschirmen den Platz, den der Text braucht. */
+.install-box .btn-primary, .install-box .btn-secondary,
+.calib-box .btn-primary, .calib-box .btn-secondary {
+  padding: clamp(7px, 2vh, 12px) 20px;
+  font-size: clamp(0.8rem, 3vh, var(--fs-md));
+}
 
 /* ── Calibration overlay ─────────────────────────────────────────────────── */
 .calib-overlay {
@@ -104,33 +130,41 @@ html, body {
   height: 100vh; height: 100dvh;
   background: rgba(0,0,0,0.82);
   display: flex; align-items: center; justify-content: center;
-  padding: 20px;
+  padding: clamp(8px, 2.5vh, 20px);
 }
 
+/* Gleiche Regel wie beim Install-Dialog: erst schrumpfen, dann scrollen,
+   niemals über den Bildschirmrand hinausragen. */
 .calib-box {
   background: var(--bg2);
   border: 2px solid var(--accent);
   border-radius: 20px;
-  padding: 24px 22px;
-  max-width: 360px; width: 100%;
+  padding: clamp(12px, 3vh, 24px) clamp(14px, 3vw, 22px);
+  max-width: min(400px, 100%);
+  max-height: 100%;
+  width: 100%;
   display: flex; flex-direction: column;
-  gap: 14px; text-align: center;
+  gap: clamp(6px, 1.8vh, 14px);
+  text-align: center;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
-.calib-box h2 { font-size: var(--fs-lg); color: var(--accent); }
-.calib-box p  { font-size: var(--fs-sm); color: var(--text2); line-height: 1.5; }
+.calib-box h2 { font-size: clamp(0.95rem, 4vh, var(--fs-lg)); color: var(--accent); }
+.calib-box p  { font-size: clamp(0.7rem, 2.4vh, var(--fs-sm)); color: var(--text2); line-height: 1.4; }
 
 .calib-wizard-icon {
-  font-size: 3rem;
+  font-size: clamp(1.4rem, 7vh, 3rem);
+  line-height: 1;
   text-align: center;
 }
 
 .calib-wizard-text {
-  font-size: var(--fs-md);
+  font-size: clamp(0.75rem, 2.8vh, var(--fs-md));
   color: var(--text2);
-  line-height: 1.5;
+  line-height: 1.4;
   text-align: center;
-  min-height: 2.5em;
+  min-height: 2.2em;
 }
 
 .calib-wizard-dots {
