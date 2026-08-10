@@ -16,11 +16,11 @@ Stand: 10.08.2026 · **v3.5 ist live** auf GitHub Pages. Offline-Test auf dem Ha
 
 ## Warten auf Feedback
 
-- **Daniel: App neu installieren** (1 SP) — Seite im Browser öffnen, links steht jetzt
-  „📲 Als App installieren". Falls Chrome keinen Dialog anbietet, zeigt der Knopf die Anleitung
-  über das ⋮-Menü.
-- **Daniel: Startdauer vom Handy ablesen** (1 SP) — App vom Home-Bildschirm starten, unten links
-  steht jetzt `v3.4 · <Zahl> ms`. Kleine Zahl trotz langem Warten heißt: die Zeit vergeht
+- **Daniel: App neu installieren** (1 SP) — Seite im Browser öffnen, unten links in der Fußzeile
+  steht jetzt „📲 Als App installieren". Falls Chrome keinen Dialog anbietet, zeigt der Knopf die
+  Anleitung über das ⋮-Menü.
+- **Daniel: Startdauer vom Handy ablesen** (1 SP) — App vom Home-Bildschirm starten, in der
+  Fußzeile steht `v3.5 · <Zahl> ms`. Kleine Zahl trotz langem Warten heißt: die Zeit vergeht
   **vor** unserem Code (Browser-Kaltstart, Service-Worker-Start, PWA-Splash) und lässt sich in
   der App nicht wegoptimieren. Große Zahl heißt: es liegt weiter bei uns, dann weitersuchen.
 
@@ -38,6 +38,13 @@ Stand: 10.08.2026 · **v3.5 ist live** auf GitHub Pages. Offline-Test auf dem Ha
 
 - **10.08.2026 – Offline-Test auf dem Handy bestanden** („klappt"). Damit ist der eigentliche
   Anlass — das Spiel lief auf dem Fest ohne Internet nicht — erledigt.
+- **10.08.2026 – v3.5: Startbildschirm neu aufgeteilt.** Von Daniel gemeldet: Installations-Knopf
+  unsichtbar, scrollen ging nicht, viel ungenutzte Fläche. Die Spalten waren vertikal zentriert
+  und ragten bei zu wenig Höhe über beide Kanten hinaus — genau dort lag der Knopf. Jetzt
+  `space-between` über die volle Höhe, alle Maße an der Viewport-Höhe (`clamp` mit `vh`), Ränder
+  am Raster statt `position: fixed`, Startknopf über die volle Spaltenbreite. Sprachauswahl ist
+  ein Aufklappmenü rechts vom Titel (nur aktive Flagge + Pfeil). Scrollen bleibt bewusst aus.
+  Geprüft bei 740×280, 915×320 und 915×412: kein Überlauf, nichts außerhalb, 10–27 px Rand.
 - **10.08.2026 – v3.4: Installierbarkeit repariert.** Von Daniel gemeldet: nach dem
   Deinstallieren bot die Seite keinen Weg zurück. Ursache war der v3.3-Umbau, der
   `serviceWorker.register()` in den Leerlauf verschob — ohne registrierten Worker stuft Chrome
