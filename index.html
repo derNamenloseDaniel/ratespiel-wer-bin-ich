@@ -40,47 +40,17 @@
   </div>
 </div>
 
-<!-- Calibration overlay -->
-<div id="calib-overlay" class="calib-overlay hidden">
-  <div class="calib-box">
-    <h2 data-i18n="calibTitle">Kalibrierung</h2>
-    <div id="calib-wizard">
-      <div class="calib-wizard-icon" id="calib-wizard-icon">📱</div>
-      <p class="calib-wizard-text" id="calib-wizard-text"></p>
-      <div class="calib-wizard-dots">
-        <span class="calib-dot"></span>
-        <span class="calib-dot"></span>
-        <span class="calib-dot"></span>
-      </div>
-      <!-- Step 0: confirm neutral position -->
-      <div id="calib-step0-ui">
-        <div id="calib-live-angles" class="calib-live-angles">β: --° γ: --°</div>
-        <button id="btn-calib-step-ok" class="btn-primary">OK</button>
-      </div>
-      <!-- Steps 1 & 2: tilt detection bar -->
-      <div id="calib-tilt-wrap" class="hidden">
-        <div class="calib-tilt-bar"><div class="calib-tilt-fill" id="calib-tilt-fill"></div></div>
-      </div>
-    </div>
-    <div id="calib-done" class="hidden">
-      <div class="calib-wizard-icon">✅</div>
-      <p class="calib-wizard-text" data-i18n="calibDone">Kalibrierung gespeichert!</p>
-    </div>
-    <button id="btn-calib-cancel" class="btn-secondary" data-i18n="back">Zurück</button>
-  </div>
-</div>
-
-<!-- Sensor debug overlay -->
+<!-- Sensor-Test: zeigt live, was die Kipperkennung misst -->
 <div id="sensor-debug" class="calib-overlay hidden">
   <div class="calib-box">
-    <h2>Sensor Debug</h2>
+    <h2 data-i18n="testTitle">Kipperkennung testen</h2>
     <div class="sensor-debug-grid">
-      <span class="sensor-debug-label">G x/y</span>  <span id="dbg-beta"  class="sensor-debug-val" style="font-size:1rem">--</span>
-      <span class="sensor-debug-label">G z/|g|</span> <span id="dbg-gamma" class="sensor-debug-val" style="font-size:1rem">--</span>
-      <span class="sensor-debug-label">Projektion</span><span id="dbg-proj"  class="sensor-debug-val">--</span>
-      <span class="sensor-debug-label">Richtung</span>  <span id="dbg-dir"   class="sensor-debug-val sensor-debug-dir">--</span>
+      <span class="sensor-debug-label" data-i18n="testAngle">Neigung</span>   <span id="dbg-beta"  class="sensor-debug-val">--</span>
+      <span class="sensor-debug-label" data-i18n="testNeutral">Ruhelage</span><span id="dbg-gamma" class="sensor-debug-val">--</span>
+      <span class="sensor-debug-label" data-i18n="testDiff">Ausschlag</span>  <span id="dbg-proj"  class="sensor-debug-val">--</span>
+      <span class="sensor-debug-label" data-i18n="testResult">Ergebnis</span> <span id="dbg-dir"   class="sensor-debug-val sensor-debug-dir">--</span>
     </div>
-    <p class="calib-wizard-text" style="font-size:0.75rem">Kippe das Handy in alle Richtungen und beobachte die Werte. "Projektion" zeigt was das Spiel messen würde.</p>
+    <p class="calib-wizard-text" data-i18n="testHint">Halte das Handy wie beim Spielen und kippe nach vorne und hinten. Seitliches Kippen darf nichts ändern.</p>
     <button id="btn-debug-close" class="btn-secondary" data-i18n="back">Zurück</button>
   </div>
 </div>
@@ -119,31 +89,28 @@
         </div>
       </div>
 
+      <!-- Keine Auswahl mehr zwischen Wort und Bild: es gibt immer beides.
+           Ohne Bild (offline und nicht vorgeladen) bleibt schlicht das Wort. -->
       <div class="start-block">
-        <div class="section-label" data-i18n="modeLabel">Spielmodus</div>
+        <div class="section-label" data-i18n="imagesLabel">Bilder</div>
         <div class="row">
-          <button class="mode-btn active" data-mode="word" data-i18n="modeWord">Wort</button>
-          <button class="mode-btn" data-mode="image" data-i18n="modeImage">Bild</button>
           <button id="btn-dl-all" class="dl-all-btn" data-i18n="dlAll">⬇ Bilder für offline</button>
-        </div>
-        <div id="storage-line" class="storage-line hidden">
-          <span id="storage-size"></span>
-          <button id="btn-storage-clear" class="storage-clear" data-i18n="clearImages">Leeren</button>
+          <div id="storage-line" class="storage-line hidden">
+            <span id="storage-size"></span>
+            <button id="btn-storage-clear" class="storage-clear" data-i18n="clearImages">Leeren</button>
+          </div>
         </div>
       </div>
 
       <div class="calib-teaser">
         <div class="calib-teaser-icon">📱</div>
         <div class="calib-teaser-text">
-          <strong data-i18n="calibTeaserTitle">Kipperkennung kalibrieren</strong>
-          <span data-i18n="calibTeaserDesc">Damit Richtig &amp; Falsch zuverlässig erkannt werden</span>
+          <strong data-i18n="calibTeaserTitle">Kipperkennung läuft automatisch</strong>
+          <span data-i18n="calibTeaserDesc">Vorne = Richtig, hinten = Weiter. Nichts einzustellen.</span>
         </div>
         <div class="calib-teaser-btns">
-          <button id="btn-open-calib" class="calib-teaser-btn" data-i18n="calibTeaserBtn">Kalibrieren</button>
-          <button id="btn-open-debug" class="calib-teaser-btn calib-teaser-btn-alt">Testen</button>
-        </div>
-        <div id="calib-done-overlay" class="calib-done-overlay hidden">
-          ✅ Kalibriert – antippen zum Ändern
+          <button id="btn-flip-tilt" class="calib-teaser-btn" data-i18n="flipTilt">Umdrehen</button>
+          <button id="btn-open-debug" class="calib-teaser-btn calib-teaser-btn-alt" data-i18n="testTilt">Testen</button>
         </div>
       </div>
 
@@ -157,7 +124,7 @@
       </div>
 
       <div class="start-footer">
-        <span class="version-label">v3.9 <span id="boot-ms"></span></span>
+        <span class="version-label">v4.0 <span id="boot-ms"></span></span>
         <div id="offline-status" class="offline-status wait">Wird für offline vorbereitet…</div>
         <!-- Immer erreichbarer Weg zur Installation, auch ohne beforeinstallprompt -->
         <button id="btn-install-inline" class="install-inline hidden" data-i18n="installBtn">📲 Als App installieren</button>
@@ -234,8 +201,8 @@
   </div>
 
   <div class="card-area">
-    <div id="card-word" class="card-word"></div>
     <img id="card-image" class="card-image hidden" alt="">
+    <div id="card-word" class="card-word"></div>
     <div id="tap-zone" class="tap-zone"></div>
   </div>
 

@@ -1,6 +1,6 @@
 # Status – Ratespiel „Wer bin ich?"
 
-Stand: 10.08.2026 · **v3.9 ist live** auf GitHub Pages. Offline-Test auf dem Handy bestanden.
+Stand: 10.08.2026 · **v4.0 ist live** auf GitHub Pages. Offline-Test auf dem Handy bestanden.
 
 ## In Arbeit
 
@@ -39,6 +39,14 @@ Stand: 10.08.2026 · **v3.9 ist live** auf GitHub Pages. Offline-Test auf dem Ha
 
 - **10.08.2026 – Offline-Test auf dem Handy bestanden** („klappt"). Damit ist der eigentliche
   Anlass — das Spiel lief auf dem Fest ohne Internet nicht — erledigt.
+- **10.08.2026 – v4.0: Kipperkennung neu gebaut, Kalibrierung entfällt.** Von Daniel gemeldet:
+  überempfindlich und falsch erkennend, vorne mit etwas Seitwärtsneigung zählt nicht mehr.
+  Ursache war die Messgröße: die Projektion einer Vektordifferenz auf eine eingemessene Richtung
+  wird bei zwei kombinierten Drehungen kürzer. Jetzt ein einziger Neigungswinkel
+  (`asin(gz/|g|)`), der gegen Seitwärtsneigung und Kopfdrehen exakt unempfindlich ist, dazu
+  Tiefpass, Schmitt-Trigger, Haltezeit und Wackler-Verwerfung. Ruhelage führt sich selbst nach,
+  der Kalibrier-Assistent ist ersatzlos weg — geblieben sind „Umdrehen“ und „Testen“.
+  Gleichzeitig: keine Auswahl mehr zwischen Wort und Bild, jede Karte zeigt beides.
 - **10.08.2026 – v3.9: Dialoge laufen nicht mehr über.** Von Daniel gemeldet: Install-Dialog zu
   groß, oben und unten abgeschnitten, kein Scrollen möglich. Feste Maße ohne `max-height` — eine
   zentrierte, zu hohe Box ragt über beide Kanten. Jetzt alle Maße in `vh`, `max-height: 100%`

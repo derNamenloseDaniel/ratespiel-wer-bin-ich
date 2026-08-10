@@ -1,7 +1,6 @@
 // ── State ──────────────────────────────────────────────────────────────────
 const S = {
   lang: 'de',
-  mode: 'word',       // 'word' | 'image'
   roundMode: 'infinite', // 'infinite' | 'time' | 'cards'
   roundValue: 0,      // seconds or card count (0 = infinite)
   category: null,
@@ -13,11 +12,6 @@ const S = {
   timer: null,
   timeLeft: 0,
   advancing: false,
-  neutralGravity: null, // {x,y,z} from accelerationIncludingGravity, auto-detected at game start
-  tiltDirX: 0,          // normalized forward-tilt direction vector in gravity space
-  tiltDirY: 1,
-  tiltDirZ: 0,
-  autoCalib: false,     // true = axis derived from screen.orientation.angle, false = saved wizard calib
   currentImage: null,
 };
 
@@ -234,35 +228,10 @@ function renderOfflineStatus() {
   const key = isOffline() ? 'offlineNow' : installed ? 'offlineReady' : 'offlinePrep';
   el.textContent = t(key);
   el.className = 'offline-status ' + (isOffline() ? 'off' : installed ? 'ok' : 'wait');
-  updateModeAvailability();
-  renderStorageLine();
-}
-
-// Gibt es überhaupt vorab geladene Bilder?
-function hasOfflineImages() {
-  return Object.values(catReadyMap()).some(n => n > 0);
-}
-
-// Der Bildmodus ist offline nur wählbar, wenn Bilder vorab geladen wurden –
-// sonst führt die Auswahl in eine Sackgasse. Mit geladenen Bildern bleibt er
-// offen, denn genau dafür ist der Vorabdownload da.
-function updateModeAvailability() {
-  const imgBtn = document.querySelector('.mode-btn[data-mode="image"]');
-  const wordBtn = document.querySelector('.mode-btn[data-mode="word"]');
-  if (!imgBtn) return;
-
-  const allowed = !isOffline() || hasOfflineImages();
-  imgBtn.disabled = !allowed;
-  imgBtn.title = allowed ? '' : t('imageNeedsNet');
-
-  if (!allowed && S.mode === 'image') {
-    S.mode = 'word';
-    imgBtn.classList.remove('active');
-    wordBtn.classList.add('active');
-  }
-
+  // Herunterladen geht nur mit Netz; das Wort läuft ohnehin immer.
   const dl = $('btn-dl-all');
   if (dl) dl.classList.toggle('hidden', isOffline());
+  renderStorageLine();
 }
 
 // ── Speicheranzeige ────────────────────────────────────────────────────────
@@ -371,7 +340,8 @@ function showCategory() {
   hideAll();
   show('screen-category');
   renderAll();
-  $('cat-hint').classList.toggle('hidden', S.mode !== 'image');
+  // Jede Kategorie ist immer spielbar — ohne Bilder eben nur mit Wörtern.
+  $('cat-hint').classList.toggle('hidden', isOffline());
 
   const grid = $('cat-grid');
   grid.innerHTML = '';
@@ -380,31 +350,23 @@ function showCategory() {
 
     const cell = document.createElement('div');
     cell.className = 'cat-cell';
-
     const have = catReadyGet(cat.id, S.lang);
 
     const btn = document.createElement('button');
     btn.className = 'cat-btn';
     btn.textContent = t(`cats.${cat.id}`);
     btn.onclick = () => { S.category = cat.id; startGame(); };
-    // Offline im Bildmodus: was nicht geladen wurde, gibt es hier auch nicht.
-    if (S.mode === 'image' && isOffline() && have === 0) {
-      btn.disabled = true;
-      btn.title = t('catNeedsDownload');
-    }
     cell.appendChild(btn);
 
-    // Im Bildmodus: pro Kategorie die Bilder vorab holen, damit sie später
-    // auch ohne Netz da sind. Der Service Worker behält sie dauerhaft.
-    if (S.mode === 'image') {
-      const dl = document.createElement('button');
-      dl.className = 'cat-dl';
-      dl.textContent = have > 0 ? `✅ ${have}` : '⬇';
-      dl.title = t('prefetchHint');
-      dl.disabled = isOffline();
-      dl.onclick = ev => { ev.stopPropagation(); prefetchCategory(cat, dl); };
-      cell.appendChild(dl);
-    }
+    // Bilder je Kategorie vorab holen, damit sie später auch ohne Netz da
+    // sind. Der Service Worker behält sie dauerhaft.
+    const dl = document.createElement('button');
+    dl.className = 'cat-dl';
+    dl.textContent = have > 0 ? `✅ ${have}` : '⬇';
+    dl.title = t('prefetchHint');
+    dl.disabled = isOffline();
+    dl.onclick = ev => { ev.stopPropagation(); prefetchCategory(cat, dl); };
+    cell.appendChild(dl);
 
     grid.appendChild(cell);
   });
@@ -522,24 +484,12 @@ async function prefetchAll(btn) {
 }
 
 // ── Screen: Game ──────────────────────────────────────────────────────────
-function applyAutoCalib() {
-  // "Steering wheel toward you" rotates around the short axis of the landscape phone.
-  // In device gravity coordinates this shows up on the X axis (Y was left/right).
-  // Sign depends on which landscape rotation the phone is in.
-  const angle = screen.orientation?.angle ?? 90;
-  const sign = angle === 270 ? 1 : -1;
-  S.tiltDirX = sign;
-  S.tiltDirY = 0;
-  S.tiltDirZ = 0;
-}
-
 async function startGame() {
   lockLandscape();
-  if (S.autoCalib) applyAutoCalib();
   S.deck = shuffle(getWords(S.category, S.lang));
   S.index = 0; S.correct = 0; S.wrong = 0;
   S.startTime = Date.now();
-  S.advancing = false; S.neutralGravity = null;
+  S.advancing = false;
   hideAll(); show('screen-game');
   hide('timer-display');
   renderAll();
@@ -547,7 +497,7 @@ async function startGame() {
   if (S.roundMode === 'time') startTimer();
   else if (S.roundMode === 'infinite') startElapsedTimer();
   await showCard();
-  calibrateTilt();
+  startTilt();
 }
 
 function searchTermFor(word) {
@@ -555,46 +505,36 @@ function searchTermFor(word) {
   return word + (cat?.imageSearchSuffix?.[S.lang] || '');
 }
 
-async function showCard(skips = 0) {
+// Immer beides: das Wort steht sofort da, das Bild kommt dazu, sobald es da
+// ist. Keine Modus-Auswahl mehr — ohne Netz und ohne vorgeladenes Bild bleibt
+// einfach das Wort, und die Karte wird nie übersprungen.
+async function showCard() {
   if (S.index >= S.deck.length) { endGame(); return; }
   const word = S.deck[S.index];
-  $('card-word').textContent = '';
+  const shownFor = S.index;
+
+  const area = document.querySelector('.card-area');
   $('card-image').src = '';
   $('card-image').classList.add('hidden');
-  $('card-word').classList.remove('hidden');
-
-  if (S.mode === 'image') {
-    $('card-word').textContent = t('loading');
-    const res = await resolveImage(searchTermFor(word));
-    const ok  = res.url ? await loadImage(res.url) : false;
-
-    if (ok) {
-      $('card-image').src = res.url;
-      $('card-image').classList.remove('hidden');
-      $('card-word').classList.add('hidden');
-      // nächste Karte vorbereiten (nur wenn Netz da ist)
-      const next = S.deck[S.index + 1];
-      if (next && navigator.onLine) resolveImage(searchTermFor(next));
-    } else if (res.offline || res.url) {
-      // Netzproblem: entweder kam die URL gar nicht erst, oder sie ist bekannt,
-      // die Bytes fehlen aber im Cache. In beiden Fällen: Wort zeigen, statt
-      // die Runde zu killen. (Vorher wurde hier übersprungen – offline hieß das:
-      // das ganze Deck rast in Sekunden durch und das Spiel endet sofort.)
-      setOffline(true);
-      $('card-word').textContent = word;
-    } else if (skips < 12) {
-      // Online, aber zu diesem Begriff gibt es wirklich kein Bild → überspringen
-      S.index++;
-      if (S.index >= S.deck.length) { endGame(); return; }
-      await showCard(skips + 1);
-      return;
-    } else {
-      $('card-word').textContent = word;
-    }
-  } else {
-    $('card-word').textContent = word;
-  }
+  area.classList.remove('has-image');
+  $('card-word').textContent = word;      // sofort lesbar, ohne aufs Netz zu warten
   updateProgress();
+
+  const res = await resolveImage(searchTermFor(word));
+  if (S.index !== shownFor) return;       // Karte ist inzwischen weiter
+  if (!res.url) { if (res.offline) setOffline(true); return; }
+
+  const ok = await loadImage(res.url);
+  if (S.index !== shownFor) return;
+  if (!ok) { setOffline(true); return; }
+
+  $('card-image').src = res.url;
+  $('card-image').classList.remove('hidden');
+  area.classList.add('has-image');
+
+  // Nächste Karte im Hintergrund vorbereiten
+  const next = S.deck[S.index + 1];
+  if (next && navigator.onLine) resolveImage(searchTermFor(next));
 }
 
 function updateProgress() {
@@ -667,7 +607,7 @@ function stopTimer() {
 // ── End Game ──────────────────────────────────────────────────────────────
 function endGame() {
   stopTimer();
-  removeOrientationListener();
+  stopTilt();
   const elapsed = Math.floor((Date.now() - S.startTime) / 1000);
   hideAll(); show('screen-summary');
   renderAll();
@@ -677,57 +617,191 @@ function endGame() {
   $('sum-score').textContent = S.correct;
 }
 
-// ── DeviceMotion (gravity vector, no gimbal lock) ─────────────────────────
-// Uses accelerationIncludingGravity instead of DeviceOrientation Euler angles.
-// The gravity vector is smooth in all orientations, including flat/landscape.
-const TILT_THRESHOLD = 5; // m/s² ≈ 30° tilt from neutral
+// ── Kipperkennung ──────────────────────────────────────────────────────────
+//
+// Gemessen wird EIN Winkel: wie weit die Bildschirmebene aus der Senkrechten
+// gekippt ist.
+//
+//   pitch = asin(gz / |g|)     0° = senkrecht (Spielhaltung), ±90° = flach
+//
+// Die Z-Achse des Geräts steht senkrecht auf dem Bildschirm. Ihr Anteil an der
+// Schwerkraft hängt deshalb NUR davon ab, wie weit nach vorne oder hinten
+// gekippt wurde. Dreht man das Handy in seiner eigenen Ebene (wie ein Lenkrad)
+// oder dreht den Kopf zur Seite, bleibt gz unverändert.
+//
+// Genau daran ist die alte Fassung gescheitert: sie projizierte die Differenz
+// zweier Schwerkraftvektoren auf eine gespeicherte Richtung. Zwei Drehungen
+// kombiniert (vorne + ein bisschen seitlich) verkürzen diese Projektion, und
+// ab etwa 20° Seitwärtsneigung reichte sie nicht mehr über die Schwelle —
+// obwohl nach vorne genauso weit gekippt wurde wie vorher.
+//
+// Dazu die drei Bausteine, die bei Neigungserkennung üblich sind:
+//   1. Tiefpass auf den Schwerkraftvektor (~1,3 Hz), damit Handzittern und
+//      Beschleunigung beim Bewegen nicht als Kippen durchgehen.
+//   2. Schmitt-Trigger: auslösen bei 30°, erst wieder scharf unter 12°.
+//      Ersetzt die alte 1,2-Sekunden-Sperre — schnelles Spielen bleibt möglich,
+//      ein einzelnes Kippen kann trotzdem nicht doppelt zählen.
+//   3. Haltezeit von 150 ms und Verwerfen von Proben, bei denen der Betrag der
+//      Beschleunigung deutlich von 1 g abweicht (= das Handy wird geschüttelt).
 
-let _orientHandler = null;
+const TILT = {
+  trigger: 30,     // Grad – ab hier zählt es als Kippen
+  release: 12,     // Grad – so weit zurück, bevor das nächste Kippen zählt
+  dwellMs: 150,    // so lange muss der Winkel gehalten werden
+  tau: 0.12,       // Zeitkonstante des Tiefpasses in Sekunden (~1,3 Hz)
+  maxShake: 3.5,   // m/s² Abweichung von 1 g – darüber gilt die Probe als Wackler
+  baseMs: 700,     // Ruhephase am Rundenstart, um die Haltung einzumessen
+  baseSpread: 6,   // Grad – so ruhig muss es dabei sein
+  driftTau: 2.5,   // Sekunden – so träge folgt die Ruhelage der Haltung
+  driftBand: 22,   // Grad – bis hierhin gilt "wird gehalten, nicht gekippt"
+};
 
-function _grav(e) {
-  const g = e.accelerationIncludingGravity;
-  return g ? { x: g.x ?? 0, y: g.y ?? 0, z: g.z ?? 0 } : null;
+const RAD = 180 / Math.PI;
+
+const _tilt = {
+  source: null,     // 'gravity' (Sensor-API) | 'motion' (devicemotion)
+  sensor: null,
+  onMotion: null,
+  g: null,          // gefilterter Schwerkraftvektor
+  lastT: 0,
+  neutral: 0,       // Ruhewinkel in Grad
+  sign: -1,         // welche Richtung ist "vorne"
+  armed: false,
+  since: 0,
+  baseline: null,   // Sammelphase am Rundenstart
+  onAngle: null,    // Rückmeldung für Kalibrierung und Debug-Anzeige
+};
+
+function tiltPitch(g) {
+  const m = Math.hypot(g.x, g.y, g.z);
+  if (m < 1) return null;
+  return Math.asin(Math.max(-1, Math.min(1, g.z / m))) * RAD;
 }
 
-function calibrateTilt() {
-  const autoCalib = e => {
-    const g = _grav(e);
-    if (!g) return;
-    S.neutralGravity = g;
-    window.removeEventListener('devicemotion', autoCalib);
-    listenTilt();
-  };
-  window.addEventListener('devicemotion', autoCalib);
-}
+// Nimmt eine rohe Schwerkraftprobe an und gibt Winkel + Ruhe-Flag zurück.
+function tiltFeed(x, y, z, alreadyFiltered) {
+  const raw = { x: x ?? 0, y: y ?? 0, z: z ?? 0 };
+  const now = performance.now();
 
-function listenTilt() {
-  let tiltCooldown = false;
-  _orientHandler = e => {
-    if (S.advancing || tiltCooldown || !S.neutralGravity) return;
-    const g = _grav(e);
-    if (!g) return;
-    const dx = g.x - S.neutralGravity.x;
-    const dy = g.y - S.neutralGravity.y;
-    const dz = g.z - S.neutralGravity.z;
-    const proj = dx * S.tiltDirX + dy * S.tiltDirY + dz * S.tiltDirZ;
-    if (proj > TILT_THRESHOLD) {
-      tiltCooldown = true;
-      setTimeout(() => { tiltCooldown = false; }, 1200);
-      triggerCorrect();
-    } else if (proj < -TILT_THRESHOLD) {
-      tiltCooldown = true;
-      setTimeout(() => { tiltCooldown = false; }, 1200);
-      triggerWrong();
-    }
-  };
-  window.addEventListener('devicemotion', _orientHandler);
-}
-
-function removeOrientationListener() {
-  if (_orientHandler) {
-    window.removeEventListener('devicemotion', _orientHandler);
-    _orientHandler = null;
+  if (alreadyFiltered) {
+    _tilt.g = raw;                       // Sensor-API liefert bereits Schwerkraft
+  } else {
+    const dt = _tilt.g ? Math.min(0.25, (now - _tilt.lastT) / 1000) : null;
+    const k = dt === null ? 1 : dt / (TILT.tau + dt);
+    _tilt.g = _tilt.g
+      ? { x: _tilt.g.x + k * (raw.x - _tilt.g.x),
+          y: _tilt.g.y + k * (raw.y - _tilt.g.y),
+          z: _tilt.g.z + k * (raw.z - _tilt.g.z) }
+      : raw;
   }
+  _tilt.lastT = now;
+
+  const pitch = tiltPitch(_tilt.g);
+  if (pitch === null) return null;
+  const steady = Math.abs(Math.hypot(raw.x, raw.y, raw.z) - 9.81) <= TILT.maxShake;
+  return { pitch, steady, now };
+}
+
+// Eine Quelle abonnieren. GravitySensor kommt aus der Generic-Sensor-API und
+// liefert die vom Betriebssystem aus Beschleunigung UND Gyroskop verrechnete
+// Schwerkraft – deutlich ruhiger als alles, was sich im JavaScript filtern
+// lässt. Gibt es sie nicht (Safari/iOS), bleibt devicemotion mit eigenem
+// Tiefpass.
+function tiltSubscribe(onSample) {
+  try {
+    if ('GravitySensor' in window) {
+      const s = new GravitySensor({ frequency: 50 });
+      s.addEventListener('reading', () => onSample(s.x, s.y, s.z, true));
+      s.addEventListener('error', () => { tiltUnsubscribe(); tiltMotionFallback(onSample); });
+      s.start();
+      _tilt.sensor = s;
+      _tilt.source = 'gravity';
+      return;
+    }
+  } catch { /* nicht verfügbar oder verboten – unten weiter */ }
+  tiltMotionFallback(onSample);
+}
+
+function tiltMotionFallback(onSample) {
+  _tilt.onMotion = e => {
+    const a = e.accelerationIncludingGravity;
+    if (a) onSample(a.x, a.y, a.z, false);
+  };
+  window.addEventListener('devicemotion', _tilt.onMotion);
+  _tilt.source = 'motion';
+}
+
+function tiltUnsubscribe() {
+  if (_tilt.sensor) { try { _tilt.sensor.stop(); } catch {} _tilt.sensor = null; }
+  if (_tilt.onMotion) { window.removeEventListener('devicemotion', _tilt.onMotion); _tilt.onMotion = null; }
+  _tilt.source = null;
+}
+
+function startTilt() {
+  stopTilt();
+  _tilt.g = null;
+  _tilt.armed = false;
+  _tilt.since = 0;
+  _tilt.baseline = { until: performance.now() + TILT.baseMs, vals: [] };
+  loadCalib();
+
+  tiltSubscribe((x, y, z, filtered) => {
+    const s = tiltFeed(x, y, z, filtered);
+    if (!s) return;
+    _tilt.onAngle?.(s);
+
+    // Rundenstart: kurz zuhören, wie das Handy gehalten wird. Nur übernehmen,
+    // wenn es dabei ruhig lag – sonst bleibt der kalibrierte Wert stehen.
+    if (_tilt.baseline) {
+      _tilt.baseline.vals.push(s.pitch);
+      if (s.now < _tilt.baseline.until) return;
+      const v = _tilt.baseline.vals;
+      const spread = Math.max(...v) - Math.min(...v);
+      if (spread <= TILT.baseSpread) _tilt.neutral = v.reduce((a, b) => a + b, 0) / v.length;
+      _tilt.baseline = null;
+      _tilt.armed = true;
+      return;
+    }
+
+    if (S.advancing) return;
+    const rel = (s.pitch - _tilt.neutral) * _tilt.sign;
+
+    const abs = Math.abs(rel);
+
+    // Ruhelage langsam nachführen, solange nicht deutlich gekippt wird. Damit
+    // macht sich die Erkennung selbst passend zu der Haltung des Spielers —
+    // eine Kalibrierung von Hand wird überflüssig.
+    //
+    // Das Band ist bewusst breiter als die Rückkehrschwelle: wer das Handy
+    // dauerhaft ein Stück schräg hält, säße sonst in einem toten Bereich fest,
+    // in dem weder ausgelöst noch nachgeführt wird — und hätte dann in die eine
+    // Richtung zu wenig Weg bis zur Schwelle und in die andere zu viel. Genau
+    // diese Schieflage ist im Test als letzter Fehlerfall aufgefallen.
+    // Eine echte Geste kann das Band nicht aufsaugen: die dauert Bruchteile
+    // einer Sekunde, die Nachführung braucht Sekunden.
+    if (abs < TILT.driftBand && s.steady) {
+      const dt = Math.min(0.25, Math.max(0, (s.now - (_tilt.driftT || s.now)) / 1000));
+      _tilt.neutral += (s.pitch - _tilt.neutral) * (dt / (TILT.driftTau + dt));
+    }
+    _tilt.driftT = s.now;
+
+    if (abs < TILT.release) { _tilt.armed = true; _tilt.since = 0; return; }
+    if (!_tilt.armed || !s.steady) { _tilt.since = 0; return; }
+    if (abs < TILT.trigger) { _tilt.since = 0; return; }
+
+    if (!_tilt.since) { _tilt.since = s.now; return; }
+    if (s.now - _tilt.since < TILT.dwellMs) return;
+
+    _tilt.armed = false;
+    _tilt.since = 0;
+    if (rel > 0) triggerCorrect(); else triggerWrong();
+  });
+}
+
+function stopTilt() {
+  tiltUnsubscribe();
+  _tilt.onAngle = null;
+  _tilt.baseline = null;
 }
 
 async function requestSensor() {
@@ -741,123 +815,27 @@ async function requestSensor() {
   }
 }
 
-// ── Calibration Wizard ─────────────────────────────────────────────────────
-const CALIB_DETECT_THRESHOLD = 3.5; // m/s² ≈ 21° tilt — enough to confirm forward tilt
-
-const _calib = {
-  step: 0,
-  latest: { x: 0, y: 0, z: 0 },
-  neutral: { x: 0, y: 0, z: 0 },
-  forward: { x: 0, y: 0, z: 0 },
-  handler: null,
-  timer: null,
-};
-
-const CALIB_STEPS_CFG = [
-  { icon: '📱', key: 'calibStep1' },
-  { icon: '✅', key: 'calibStep2' },
-];
-
+// ── Ruhelage und Kipprichtung ──────────────────────────────────────
+// Der geführte Kalibrier-Assistent ist ersatzlos entfallen. Er hat einen
+// 3D-Richtungsvektor eingemessen — genau das war die Ursache der
+// Fehlerkennungen. Ein einzelner Neigungswinkel braucht keine Einmessung:
+// senkrecht ist 0°, die Ruhelage führt sich während des Spiels selbst nach,
+// und die Richtung ist physikalisch festgelegt. Bleibt genau ein Handgriff
+// für den Fall, dass ein Gerät die Achse gespiegelt meldet: umdrehen.
 function loadCalib() {
-  const stored = localStorage.getItem('tilt_calib');
-  if (stored) {
-    const c = JSON.parse(stored);
-    S.tiltDirX = c.dirX ?? 0;
-    S.tiltDirY = c.dirY ?? 1;
-    S.tiltDirZ = c.dirZ ?? 0;
-  }
-}
-
-function openCalib() {
-  _calib.step = 0;
-  _calib.latest = { x: 0, y: 0, z: 0 };
-  _calib.neutral = { x: 0, y: 0, z: 0 };
-  _calib.forward = { x: 0, y: 0, z: 0 };
-  show('calib-overlay');
-  show('calib-wizard');
-  hide('calib-done');
-  _calibRunStep(0);
-}
-
-function closeCalib() {
-  hide('calib-overlay');
-  if (_calib.handler) { window.removeEventListener('devicemotion', _calib.handler); _calib.handler = null; }
-  clearTimeout(_calib.timer);
-}
-
-function _calibRunStep(step) {
-  if (_calib.handler) { window.removeEventListener('devicemotion', _calib.handler); _calib.handler = null; }
-  clearTimeout(_calib.timer);
-  _calib.step = step;
-
-  if (step > 1) { _calibSave(); return; }
-
-  const cfg = CALIB_STEPS_CFG[step];
-  $('calib-wizard-icon').textContent = cfg.icon;
-  $('calib-wizard-text').textContent = t(cfg.key);
-  document.querySelectorAll('.calib-dot').forEach((d, i) => {
-    d.classList.toggle('calib-dot-active', i === step);
-  });
-
-  if (step === 0) {
-    // Hold straight → click OK
-    show('calib-step0-ui');
-    hide('calib-tilt-wrap');
-    _calib.handler = e => {
-      const g = _grav(e);
-      if (!g) return;
-      _calib.latest = g;
-      const mag = Math.sqrt(g.x*g.x + g.y*g.y + g.z*g.z);
-      $('calib-live-angles').textContent = `Sensor: ${mag.toFixed(1)} m/s²`;
-    };
-    window.addEventListener('devicemotion', _calib.handler);
-  } else {
-    // Tilt forward → must hold above threshold for 600ms to avoid accidental triggers
-    hide('calib-step0-ui');
-    show('calib-tilt-wrap');
-    $('calib-tilt-fill').style.width = '0%';
-    let holdTimer = null;
-    let holdGravity = null;
-    _calib.handler = e => {
-      const g = _grav(e);
-      if (!g) return;
-      const dx = g.x - _calib.neutral.x;
-      const dy = g.y - _calib.neutral.y;
-      const dz = g.z - _calib.neutral.z;
-      const mag = Math.sqrt(dx*dx + dy*dy + dz*dz);
-      $('calib-tilt-fill').style.width = Math.min(100, (mag / CALIB_DETECT_THRESHOLD) * 100) + '%';
-      if (mag >= CALIB_DETECT_THRESHOLD) {
-        holdGravity = g;
-        if (!holdTimer) holdTimer = setTimeout(() => {
-          _calib.forward = holdGravity;
-          _calibRunStep(2);
-        }, 600);
-      } else {
-        clearTimeout(holdTimer);
-        holdTimer = null;
-      }
-    };
-    window.addEventListener('devicemotion', _calib.handler);
-  }
-}
-
-function _calibSave() {
-  // 3D direction vector = normalize(forward − neutral). Backward = its inverse.
-  const dx = _calib.forward.x - _calib.neutral.x;
-  const dy = _calib.forward.y - _calib.neutral.y;
-  const dz = _calib.forward.z - _calib.neutral.z;
-  const len = Math.sqrt(dx*dx + dy*dy + dz*dz);
-  const dirX = len > 0.5 ? dx/len : 0;
-  const dirY = len > 0.5 ? dy/len : 1;
-  const dirZ = len > 0.5 ? dz/len : 0;
-  S.tiltDirX = dirX; S.tiltDirY = dirY; S.tiltDirZ = dirZ;
-  localStorage.setItem('tilt_calib', JSON.stringify({ dirX, dirY, dirZ }));
-  document.querySelectorAll('.calib-dot').forEach((d, i) => {
-    d.classList.toggle('calib-dot-active', i === 2);
-  });
-  hide('calib-wizard');
-  show('calib-done');
-  _calib.timer = setTimeout(closeCalib, 1500);
+  try {
+    const c = JSON.parse(localStorage.getItem('tilt_calib_v2') || 'null');
+    if (c) {
+      _tilt.neutral = Number.isFinite(c.neutral) ? c.neutral : 0;
+      _tilt.sign = c.sign === 1 ? 1 : -1;
+      return true;
+    }
+  } catch {}
+  // Ohne Kalibrierung ist die Physik der beste Vorgabewert: senkrecht gehalten
+  // ist 0°, und nach vorne kippen dreht den Bildschirm zum Boden (gz negativ).
+  _tilt.neutral = 0;
+  _tilt.sign = -1;
+  return false;
 }
 
 // ── PWA Install ────────────────────────────────────────────────────────────
@@ -997,16 +975,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // Tippen irgendwo sonst schließt das Menü wieder
   document.addEventListener('click', closeLangMenu);
 
-  // Mode buttons
-  document.querySelectorAll('.mode-btn').forEach(b => {
-    b.addEventListener('click', () => {
-      if (b.disabled) return;
-      document.querySelectorAll('.mode-btn').forEach(x => x.classList.remove('active'));
-      b.classList.add('active');
-      S.mode = b.dataset.mode;
-    });
-  });
-
   // Bilder für offline: alles am Stück laden + Speicheranzeige
   $('btn-dl-all').addEventListener('click', () => prefetchAll($('btn-dl-all')));
   $('btn-storage-clear').addEventListener('click', clearOfflineImages);
@@ -1062,16 +1030,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // Central tap zone → correct
   $('tap-zone').addEventListener('click', triggerCorrect);
 
-  // Calibration
-  $('btn-open-calib').addEventListener('click', openCalib);
-  $('btn-calib-cancel').addEventListener('click', closeCalib);
-  $('btn-calib-step-ok').addEventListener('click', () => {
-    if (_calib.step !== 0) return;
-    lockLandscape();
-    _calib.neutral = { ..._calib.latest };
-    _calibRunStep(1);
-  });
-
   // Orientation lock toggle button
   let _orientLocked = false;
   $('btn-orient-lock').addEventListener('click', () => {
@@ -1086,31 +1044,46 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Sensor debug
-  let _dbgHandler = null;
+  // Kipprichtung umdrehen – der einzige Handgriff, den die Erkennung noch
+  // braucht, falls Richtig und Weiter auf einem Gerät vertauscht ankommen.
+  $('btn-flip-tilt').addEventListener('click', () => {
+    loadCalib();
+    _tilt.sign = -_tilt.sign;
+    try { localStorage.setItem('tilt_calib_v2', JSON.stringify({ neutral: 0, sign: _tilt.sign })); } catch {}
+    const b = $('btn-flip-tilt');
+    b.textContent = t('flipDone');
+    setTimeout(() => { b.textContent = t('flipTilt'); }, 1400);
+  });
+
+  // Sensor-Test: zeigt live, was die Erkennung misst
   $('btn-open-debug').addEventListener('click', () => {
     show('sensor-debug');
-    let dbgNeutral = null;
-    _dbgHandler = e => {
-      const g = _grav(e);
-      if (!g) return;
-      if (dbgNeutral === null) dbgNeutral = { x: g.x, y: g.y, z: g.z };
-      const mag = Math.sqrt(g.x*g.x + g.y*g.y + g.z*g.z);
-      $('dbg-beta').textContent  = `x:${g.x.toFixed(1)} y:${g.y.toFixed(1)}`;
-      $('dbg-gamma').textContent = `z:${g.z.toFixed(1)}  |g|:${mag.toFixed(1)}`;
-      const dx = g.x - dbgNeutral.x;
-      const dy = g.y - dbgNeutral.y;
-      const dz = g.z - dbgNeutral.z;
-      const proj = dx * S.tiltDirX + dy * S.tiltDirY + dz * S.tiltDirZ;
-      $('dbg-proj').textContent = proj.toFixed(1) + ' m/s²';
-      const dir = proj > TILT_THRESHOLD ? '✅ RICHTIG' : proj < -TILT_THRESHOLD ? '❌ WEITER' : '↔ neutral';
-      $('dbg-dir').textContent = dir;
-    };
-    window.addEventListener('devicemotion', _dbgHandler);
+    loadCalib();
+    stopTilt();
+    _tilt.g = null;
+    let neutral = null, drift = 0;
+    tiltSubscribe((x, y, z, filtered) => {
+      const s = tiltFeed(x, y, z, filtered);
+      if (!s) return;
+      if (neutral === null) neutral = s.pitch;
+      const rel = (s.pitch - neutral) * _tilt.sign;
+      if (Math.abs(rel) < TILT.release && s.steady) {
+        const dt = Math.min(0.25, Math.max(0, (s.now - (drift || s.now)) / 1000));
+        neutral += (s.pitch - neutral) * (dt / (TILT.driftTau + dt));
+      }
+      drift = s.now;
+      $('dbg-beta').textContent  = `${s.pitch.toFixed(0)}°`;
+      $('dbg-gamma').textContent = `${neutral.toFixed(0)}°`;
+      $('dbg-proj').textContent  = `${rel >= 0 ? '+' : ''}${rel.toFixed(0)}° (${_tilt.source === 'gravity' ? 'Sensor' : 'Motion'})`;
+      $('dbg-dir').textContent = !s.steady ? '～ Wackler'
+        : rel >= TILT.trigger ? '✅ RICHTIG'
+        : rel <= -TILT.trigger ? '❌ WEITER'
+        : '↔ neutral';
+    });
   });
   $('btn-debug-close').addEventListener('click', () => {
     hide('sensor-debug');
-    if (_dbgHandler) { window.removeEventListener('devicemotion', _dbgHandler); _dbgHandler = null; }
+    stopTilt();
   });
 
   // Navigation
@@ -1188,11 +1161,6 @@ document.addEventListener('DOMContentLoaded', () => {
   setOffline(!navigator.onLine);
 
   loadCalib();
-  if (localStorage.getItem('tilt_calib')) {
-    const overlay = $('calib-done-overlay');
-    overlay.classList.remove('hidden');
-    overlay.addEventListener('click', () => overlay.classList.add('hidden'), { once: true });
-  }
   showStart();
   renderAll();
   refreshStorageWhenIdle();

@@ -167,55 +167,6 @@ html, body {
   min-height: 2.2em;
 }
 
-.calib-wizard-dots {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-}
-
-.calib-dot {
-  width: 10px; height: 10px;
-  border-radius: 50%;
-  background: var(--accent2);
-  transition: background 0.3s;
-}
-.calib-dot-active { background: var(--accent); }
-
-.calib-live-angles {
-  font-size: var(--fs-sm);
-  color: var(--text2);
-  font-variant-numeric: tabular-nums;
-  min-height: 1.4em;
-  text-align: center;
-}
-
-.calib-tilt-wrap {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: center;
-}
-
-.calib-tilt-bar {
-  width: 100%;
-  height: 14px;
-  background: var(--bg);
-  border-radius: 7px;
-  overflow: hidden;
-  border: 1px solid var(--accent2);
-}
-
-.calib-tilt-fill {
-  height: 100%;
-  width: 0%;
-  background: var(--accent);
-  border-radius: 7px;
-  transition: width 0.08s linear;
-}
-
-#calib-done { display: flex; flex-direction: column; align-items: center; gap: 10px; }
-
 .sensor-debug-grid {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -246,24 +197,6 @@ html, body {
   display: flex;
   gap: 6px;
   flex-shrink: 0;
-}
-
-.calib-done-overlay {
-  position: absolute;
-  inset: 0;
-  border-radius: var(--radius);
-  background: color-mix(in srgb, var(--bg2) 92%, transparent);
-  backdrop-filter: blur(2px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--accent);
-  cursor: pointer;
-  user-select: none;
-  border: 2px solid var(--accent);
-  border-radius: var(--radius);
 }
 
 .calib-teaser-icon {
@@ -439,7 +372,7 @@ h1 {
 }
 
 /* Toggle buttons */
-.mode-btn, .round-btn, .time-preset, .cards-preset {
+.round-btn, .time-preset, .cards-preset {
   padding: clamp(6px, 1.8vh, 10px) 16px;
   border: 2px solid var(--accent2);
   border-radius: var(--radius);
@@ -451,7 +384,7 @@ h1 {
   min-width: 64px;
   white-space: nowrap;
 }
-.mode-btn.active, .round-btn.active,
+.round-btn.active,
 .time-preset.active, .cards-preset.active {
   background: var(--accent);
   border-color: var(--accent);
@@ -523,7 +456,7 @@ h1 {
 /* Querformat mit sichtbarer Browserleiste: dort bleiben oft nur ~330 px Höhe.
    Alles enger ziehen, damit der Startbildschirm ohne Scrollen passt. */
 @media (max-height: 430px) {
-  .mode-btn, .round-btn, .time-preset, .cards-preset, .lang-trigger { padding: 5px 11px; }
+  .round-btn, .time-preset, .cards-preset, .lang-trigger { padding: 5px 11px; }
   .sub-options { padding: 7px; gap: 6px; }
   .section-label { margin-top: 0; letter-spacing: 0.5px; }
   .calib-teaser-text span { display: none; }   /* Untertitel raus, Titel reicht */
@@ -657,8 +590,8 @@ h1 {
 }
 
 /* Gesperrte Auswahl: Bildmodus ohne Netz und ohne geladene Bilder */
-.mode-btn[disabled], .cat-btn[disabled] { opacity: 0.35; cursor: not-allowed; }
-.mode-btn[disabled]:hover, .cat-btn[disabled]:hover {
+.cat-btn[disabled] { opacity: 0.35; cursor: not-allowed; }
+.cat-btn[disabled]:hover {
   background: var(--bg2); border-color: var(--accent2); color: var(--text);
 }
 
@@ -726,11 +659,14 @@ h1 {
 }
 
 /* Card area fills remaining space */
+/* Wort und Bild zusammen: das Bild füllt die Fläche, das Wort steht darüber.
+   Fehlt das Bild, rückt das Wort in die Mitte und wird größer. */
 .card-area {
   flex: 1;
   position: relative;
   display: flex; align-items: center; justify-content: center;
   width: 100%;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -739,11 +675,21 @@ h1 {
   font-weight: 900;
   text-align: center;
   color: #fff;
-  text-shadow: 0 2px 20px rgba(0,0,0,0.5);
+  text-shadow: 0 2px 20px rgba(0,0,0,0.6);
   line-height: 1.1;
   word-break: break-word;
   padding: 0 16px;
   pointer-events: none;
+}
+
+/* Mit Bild wandert das Wort nach unten und bekommt einen Schleier, damit es
+   auf jedem Motiv lesbar bleibt. */
+.card-area.has-image .card-word {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  font-size: clamp(1.1rem, 8vh, 2.6rem);
+  padding: 22px 16px 8px;
+  background: linear-gradient(to top, rgba(0,0,0,0.78) 35%, transparent);
 }
 
 .card-image {

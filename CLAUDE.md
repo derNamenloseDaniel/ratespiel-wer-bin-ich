@@ -43,6 +43,7 @@ Nie vergessen. Keine Ausnahme.
 | v3.6        | v32        | 2026-08-10 | `100dvh` statt `100vh` — auf Android Chrome lag der untere Streifen samt Fußzeile und Installations-Knopf hinter der Adressleiste |
 | v3.8        | v34        | 2026-08-10 | Erkennt über `getInstalledRelatedApps`, ob die App noch installiert ist, und sagt das statt eine nutzlose Anleitung zu zeigen; `requestFullscreen`-Ablehnung abgefangen |
 | v3.9        | v35        | 2026-08-10 | Dialoge passen sich der Höhe an (`max-height: 100%`, Maße in `vh`); reicht es nicht, scrollt der Inhalt statt über den Rand zu laufen |
+| v4.0        | v37        | 2026-08-10 | Kipperkennung neu: ein Neigungswinkel statt Vektorprojektion, Kalibrier-Assistent entfällt; Wort und Bild immer zusammen statt Modus-Auswahl |
 
 ## Offline – die Regeln, die dabei gelernt wurden
 
@@ -162,6 +163,55 @@ Nutzer.
 Gemessen wird nicht geschätzt: das Versionslabel zeigt die Startdauer (`v3.3 · 14 ms`). Steht dort
 eine kleine Zahl, der Start fühlt sich aber trotzdem lang an, liegt es **vor** unserem Code
 (Browser-Kaltstart, Service-Worker-Start, PWA-Splash) — dann bringt Optimieren an der App nichts.
+
+## Kipperkennung — wie sie funktioniert und warum
+
+Gemessen wird **ein** Winkel: `pitch = asin(gz / |g|)`. Die Z-Achse des Geräts steht senkrecht auf
+dem Bildschirm, ihr Anteil an der Schwerkraft hängt deshalb nur davon ab, wie weit nach vorne oder
+hinten gekippt wurde. Senkrecht gehalten = 0°, flach = ±90°.
+
+**Das ist der Kern der Sache:** Seitliches Kippen (Drehung in der Bildschirmebene) und Kopfdrehen
+(Drehung um die Weltsenkrechte) ändern `gz` mathematisch **exakt nicht**. Die alte Fassung
+projizierte stattdessen die Differenz zweier Schwerkraftvektoren auf eine eingemessene Richtung —
+und bei zwei kombinierten Drehungen wird diese Projektion kürzer. Ab etwa 20° Seitwärtsneigung
+reichte sie nicht mehr über die Schwelle, obwohl nach vorne genauso weit gekippt wurde. Genau das
+war die gemeldete Fehlbedienbarkeit.
+
+Darum herum die drei Bausteine, die bei Neigungserkennung üblich sind:
+
+| Baustein | Wert | Wozu |
+|---|---|---|
+| Tiefpass auf die Schwerkraft | τ = 0,12 s (≈1,3 Hz) | Handzittern und Beschleunigung beim Bewegen |
+| Schmitt-Trigger | aus bei 30°, scharf unter 12° | ein Kippen zählt genau einmal, ohne Sperrzeit |
+| Haltezeit | 150 ms | Ausreißer und Spitzen |
+| Wackler verwerfen | ‖g‖ weicht > 3,5 m/s² von 1 g ab | Schütteln ist kein Kippen |
+| Ruhelage-Nachführung | τ = 2,5 s, nur unter 22° Ausschlag | ersetzt die Kalibrierung von Hand |
+
+**Keine Kalibrierung mehr.** Ohne gespeicherte Werte gilt: Ruhelage 0°, vorne = Bildschirm kippt
+zum Boden. Am Rundenstart werden 700 ms lang Proben gesammelt und als Ruhelage übernommen, wenn
+sie ruhig genug lagen; danach führt die Nachführung sie langsam nach. Das Nachführ-Band ist
+**breiter als die Rückkehrschwelle** — sonst säße ein dauerhaft schräg gehaltenes Handy in einem
+toten Bereich fest, in dem weder ausgelöst noch nachgeführt wird. Bleibt genau ein Handgriff für
+den Fall, dass ein Gerät die Achse gespiegelt meldet: der Knopf **Umdrehen**.
+
+**Quelle:** `GravitySensor` (Generic Sensor API, Chrome/Android) liefert die vom Betriebssystem
+aus Beschleunigung und Gyroskop verrechnete Schwerkraft und ist deutlich ruhiger als alles, was
+sich in JavaScript filtern lässt. Fehlt sie (Safari/iOS), greift `devicemotion` mit eigenem
+Tiefpass. Keine Bibliothek: die Mathematik sind zwanzig Zeilen, und ein weiteres Paket müsste
+zusätzlich in den Offline-Cache.
+
+**Prüfen ohne Gerät:** einen Schwerkraftvektor für eine Haltung rechnen und einspeisen. Ein
+Bezugspunkt ohne Rotationsmathematik ist verlässlicher als selbstgebaute Drehmatrizen — flach mit
+Bildschirm nach oben ist laut Spezifikation `az = +9,81`, nach unten `-9,81`. In zwei Anläufen war
+mein Prüfstand seitenverkehrt und die App richtig; erst der feste Bezugspunkt hat das geklärt.
+
+## Wort und Bild: keine Auswahl mehr
+
+Es gibt keinen Wort- und keinen Bildmodus. Jede Karte zeigt das Wort sofort — ohne aufs Netz zu
+warten — und blendet das Bild dazu, sobald es da ist (`.card-area.has-image` schiebt das Wort mit
+Schleier nach unten). Fehlt das Bild, bleibt das Wort groß in der Mitte. Eine Karte wird nie
+übersprungen, und keine Kategorie ist je gesperrt. Der Vorabdownload bleibt, weil er entscheidet,
+ob offline Bilder da sind.
 
 ## Projekt-Übersicht
 
