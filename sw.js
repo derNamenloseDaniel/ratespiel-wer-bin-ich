@@ -7,7 +7,7 @@
 // Der catch() greift also nie oder erst nach Minuten → die App startete nicht.
 // Deshalb: Shell IMMER zuerst aus dem Cache, Netz nur noch im Hintergrund.
 
-const VERSION   = 'v29';
+const VERSION   = 'v31';
 const SHELL     = `ratespiel-shell-${VERSION}`;
 const MEDIA     = 'ratespiel-media';   // Wikipedia-Bilder/-Antworten, überlebt Versionswechsel
 // Reicht für alle elf Kategorien (~540 Bilder) mit reichlich Luft. Gezählt
@@ -72,6 +72,12 @@ self.addEventListener('fetch', e => {
 // halten Funk und Service Worker unnötig wach.
 const revalidated = new Set();
 
+// Beim Auffrischen am HTTP-Cache des Browsers vorbei fragen. Sonst holt sich
+// der Worker unter Umständen genau die veraltete Datei zurück, die er ersetzen
+// wollte. Bewusst eine neue Request statt fetch(req, {cache}): eine Request im
+// Modus "navigate" lässt sich nicht mit init-Optionen weiterreichen.
+const fresh = req => new Request(req.url, { cache: 'no-cache', credentials: 'same-origin' });
+
 // Cache zuerst, Netz nur im Hintergrund zum Auffrischen.
 async function shellFirst(req) {
   const cache  = await caches.open(SHELL);
@@ -81,13 +87,13 @@ async function shellFirst(req) {
     // stale-while-revalidate: blockiert nie, aktualisiert für den nächsten Start
     if (navigator.onLine && !revalidated.has(req.url)) {
       revalidated.add(req.url);
-      fetch(req).then(r => { if (r && r.ok) cache.put(req, r.clone()); }).catch(() => {});
+      fetch(fresh(req)).then(r => { if (r && r.ok) cache.put(req, r.clone()); }).catch(() => {});
     }
     return cached;
   }
 
   try {
-    const r = await fetch(req);
+    const r = await fetch(fresh(req));
     if (r && r.ok) cache.put(req, r.clone());
     return r;
   } catch {

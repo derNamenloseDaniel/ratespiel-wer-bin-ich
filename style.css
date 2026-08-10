@@ -189,15 +189,22 @@ html, body {
 .sensor-debug-dir   { font-size: 1rem; }
 
 .calib-teaser {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
   background: var(--bg2);
   border: 2px solid var(--accent);
   border-radius: var(--radius);
-  padding: 10px 14px;
+  padding: clamp(6px, 1.6vh, 12px) 14px;
   width: 100%;
   cursor: pointer;
+}
+
+.calib-teaser-btns {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .calib-done-overlay {
@@ -219,7 +226,8 @@ html, body {
 }
 
 .calib-teaser-icon {
-  font-size: 1.6rem;
+  font-size: clamp(1.1rem, 4vh, 1.7rem);
+  line-height: 1;
   flex-shrink: 0;
 }
 
@@ -245,7 +253,7 @@ html, body {
 
 .calib-teaser-btn {
   flex-shrink: 0;
-  padding: 8px 16px;
+  padding: clamp(5px, 1.4vh, 9px) 14px;
   background: var(--accent);
   color: #fff;
   border: none;
@@ -253,9 +261,11 @@ html, body {
   font-size: var(--fs-sm);
   font-weight: 700;
   cursor: pointer;
+  white-space: nowrap;
   transition: opacity 0.15s;
 }
 .calib-teaser-btn:active { opacity: 0.8; }
+.calib-teaser-btn-alt { background: var(--accent2); }
 
 /* ── Rotate Hint ─────────────────────────────────────────────────────────── */
 .rotate-hint {
@@ -275,32 +285,103 @@ html, body {
 }
 
 /* ── Start Screen ────────────────────────────────────────────────────────── */
+/* Der Startbildschirm scrollt bewusst nicht. Stattdessen verteilen sich die
+   Blöcke über die volle Höhe (space-between) und alle Maße hängen an der
+   Viewport-Höhe, damit es auch im Querformat mit Browserleiste passt.
+   Sicherheitsabstand nach außen: padding am Raster, nichts klebt am Rand. */
 .start-inner {
   width: 100%; height: 100%;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0 24px;
-  padding: 12px 24px;
-  align-items: center;
+  gap: 0 clamp(16px, 3vw, 36px);
+  padding: clamp(10px, 3vh, 20px) clamp(16px, 3vw, 32px);
+  align-items: stretch;
 }
 
 .start-col {
   display: flex; flex-direction: column;
-  gap: 8px;
+  gap: clamp(6px, 1.6vh, 14px);
   height: 100%;
-  justify-content: center;
+  min-height: 0;
+  justify-content: space-between;
+  align-items: flex-start;
 }
 
-.start-col-left { align-items: flex-start; }
-.start-col-right { align-items: flex-start; }
+/* Zusammengehöriges bleibt beieinander, der Abstand entsteht zwischen den
+   Blöcken – sonst reißt space-between Label und Knöpfe auseinander. */
+.start-block {
+  display: flex; flex-direction: column;
+  gap: clamp(4px, 1vh, 8px);
+  width: 100%;
+}
+
+.title-row {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%;
+}
 
 h1 {
-  font-size: clamp(1.8rem, 5.5vw, 3.5rem);
+  font-size: clamp(1.3rem, 9vh, 3.2rem);
   font-weight: 900;
   color: var(--accent);
   letter-spacing: -1px;
   line-height: 1;
+  flex: 1;
+  min-width: 0;
 }
+
+/* ── Sprachauswahl: eine Flagge, Rest im Aufklappmenü ────────────────────── */
+.lang-select { position: relative; flex-shrink: 0; }
+
+.lang-trigger {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px;
+  background: var(--bg2);
+  border: 2px solid var(--accent2);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+}
+.lang-trigger:active { opacity: 0.8; }
+
+.lang-caret {
+  font-size: 0.7em;
+  color: var(--text2);
+  transition: transform 0.15s;
+}
+.lang-select.open .lang-caret { transform: rotate(180deg); }
+.lang-select.open .lang-trigger { border-color: var(--accent); }
+
+.lang-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 50;
+  display: flex; flex-direction: column;
+  min-width: 100%;
+  background: var(--bg2);
+  border: 2px solid var(--accent);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+}
+
+.lang-option {
+  padding: 8px 14px;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.lang-option.active { background: var(--accent); color: #fff; }
+.lang-option:not(.active):active { background: var(--accent2); }
 
 .section-label {
   font-size: var(--fs-sm);
@@ -316,8 +397,8 @@ h1 {
 }
 
 /* Toggle buttons */
-.lang-btn, .mode-btn, .round-btn, .time-preset, .cards-preset {
-  padding: 8px 16px;
+.mode-btn, .round-btn, .time-preset, .cards-preset {
+  padding: clamp(6px, 1.8vh, 10px) 16px;
   border: 2px solid var(--accent2);
   border-radius: var(--radius);
   background: transparent;
@@ -328,7 +409,7 @@ h1 {
   min-width: 64px;
   white-space: nowrap;
 }
-.lang-btn.active, .mode-btn.active, .round-btn.active,
+.mode-btn.active, .round-btn.active,
 .time-preset.active, .cards-preset.active {
   background: var(--accent);
   border-color: var(--accent);
@@ -395,6 +476,16 @@ h1 {
   border: 1px solid var(--accent);
   font-size: var(--fs-sm);
   color: var(--text2);
+}
+
+/* Querformat mit sichtbarer Browserleiste: dort bleiben oft nur ~330 px Höhe.
+   Alles enger ziehen, damit der Startbildschirm ohne Scrollen passt. */
+@media (max-height: 430px) {
+  .mode-btn, .round-btn, .time-preset, .cards-preset, .lang-trigger { padding: 5px 11px; }
+  .sub-options { padding: 7px; gap: 6px; }
+  .section-label { margin-top: 0; letter-spacing: 0.5px; }
+  .calib-teaser-text span { display: none; }   /* Untertitel raus, Titel reicht */
+  .btn-start-big { padding: 10px 24px; }
 }
 
 /* ── Category Screen ─────────────────────────────────────────────────────── */
@@ -470,8 +561,21 @@ h1 {
 }
 .cat-dl:active { opacity: 0.7; }
 
+.start-footer {
+  display: flex; align-items: center; gap: 8px;
+  flex-wrap: wrap;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+/* Der Startknopf darf sich die Breite nehmen, die rechts ohnehin frei steht. */
+.btn-start-big {
+  width: 100%;
+  padding: clamp(10px, 3vh, 20px) 24px;
+  font-size: clamp(1rem, 4vh, 1.6rem);
+}
+
 .install-inline {
-  align-self: flex-start;
   padding: 6px 14px;
   background: var(--accent2);
   border: 2px solid var(--accent);
@@ -521,8 +625,8 @@ h1 {
   font-size: 0.68rem;
   padding: 3px 9px;
   border-radius: 999px;
-  align-self: flex-start;
   border: 1px solid transparent;
+  white-space: nowrap;
 }
 .offline-status.ok   { color: var(--green); border-color: color-mix(in srgb, var(--green) 40%, transparent); }
 .offline-status.wait { color: var(--text2); border-color: color-mix(in srgb, var(--text2) 30%, transparent); }
@@ -641,14 +745,14 @@ h1 {
 }
 
 /* ── Summary Screen ──────────────────────────────────────────────────────── */
+/* Sitzt jetzt in der Fußzeile statt position:fixed am Bildschirmrand –
+   fixed hat sich mit dem Inhalt überlagert und hatte keinen Rand. */
 .version-label {
-  position: fixed;
-  bottom: 6px;
-  left: 10px;
   font-size: 0.65rem;
-  color: var(--accent2);
-  pointer-events: none;
-  z-index: 1;
+  color: var(--text2);
+  opacity: 0.7;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 #screen-summary { padding: 16px; }

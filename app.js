@@ -936,14 +936,38 @@ function unlockLandscape() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Language buttons
-  document.querySelectorAll('.lang-btn').forEach(b => {
-    b.addEventListener('click', () => {
-      document.querySelectorAll('.lang-btn').forEach(x => x.classList.remove('active'));
-      b.classList.add('active');
-      setLang(b.dataset.lang);
+  // Sprachauswahl: eine Flagge sichtbar, Rest im Aufklappmenü
+  const langSelect = document.querySelector('.lang-select');
+  const langMenu   = $('lang-menu');
+  const LANG_FLAGS = { de: '🇩🇪', en: '🇬🇧' };
+
+  const closeLangMenu = () => {
+    langSelect.classList.remove('open');
+    langMenu.classList.add('hidden');
+    $('lang-current').setAttribute('aria-expanded', 'false');
+  };
+
+  $('lang-current').addEventListener('click', e => {
+    e.stopPropagation();
+    const open = langSelect.classList.toggle('open');
+    langMenu.classList.toggle('hidden', !open);
+    $('lang-current').setAttribute('aria-expanded', String(open));
+  });
+
+  document.querySelectorAll('.lang-option').forEach(b => {
+    b.addEventListener('click', e => {
+      e.stopPropagation();
+      const l = b.dataset.lang;
+      document.querySelectorAll('.lang-option').forEach(x => x.classList.toggle('active', x === b));
+      $('lang-flag').textContent = LANG_FLAGS[l] || '';
+      $('lang-code').textContent = l.toUpperCase();
+      closeLangMenu();
+      setLang(l);
     });
   });
+
+  // Tippen irgendwo sonst schließt das Menü wieder
+  document.addEventListener('click', closeLangMenu);
 
   // Mode buttons
   document.querySelectorAll('.mode-btn').forEach(b => {

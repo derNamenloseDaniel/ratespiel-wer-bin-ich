@@ -1,6 +1,6 @@
 # Status – Ratespiel „Wer bin ich?"
 
-Stand: 10.08.2026 · **v3.4 ist live** auf GitHub Pages. Offline-Test auf dem Handy bestanden.
+Stand: 10.08.2026 · **v3.5 ist live** auf GitHub Pages. Offline-Test auf dem Handy bestanden.
 
 ## In Arbeit
 

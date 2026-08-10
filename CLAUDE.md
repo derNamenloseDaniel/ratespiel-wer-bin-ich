@@ -39,6 +39,7 @@ Nie vergessen. Keine Ausnahme.
 | v3.2        | v27        | 2026-08-10 | Speicheranzeige zählt den Media-Cache selbst statt `storage.estimate()` – nach "Leeren" stand dort weiter der alte Wert |
 | v3.3        | v28        | 2026-08-10 | Startzeit: Startscreen ohne JS sichtbar, AudioContext erst beim ersten Ton, Speicherzählung und SW-Registrierung in die Leerlaufzeit, SW frischt je Datei nur einmal pro Lebensdauer auf; Startdauer am Versionslabel abzulesen |
 | v3.4        | v29        | 2026-08-10 | SW-Registrierung wieder sofort (v3.3 hat damit die Installierbarkeit zerschossen); dauerhafter „Als App installieren"-Knopf mit Anleitung, wenn der Browser kein `beforeinstallprompt` schickt |
+| v3.5        | v31        | 2026-08-10 | Startbildschirm neu aufgeteilt: kein Scrollen, Ränder ringsum, Sprachauswahl als Aufklappmenü rechts vom Titel, Maße an der Viewport-Höhe; SW frischt am HTTP-Cache vorbei auf |
 
 ## Offline – die Regeln, die dabei gelernt wurden
 
@@ -57,7 +58,13 @@ Nie vergessen. Keine Ausnahme.
 6. **Beim Entwickeln hinkt cache-first eine Runde hinterher.** Nach einer Änderung an
    `app.js`/`style.css` zeigt der erste Reload noch die alte Datei — die neue landet dabei nur im
    Hintergrund im Cache und greift erst beim zweiten Reload. Wer das nicht weiß, testet die
-   Vorgängerversion und wundert sich. Also: zweimal neu laden, oder `caches.delete()` vorweg.
+   Vorgängerversion und wundert sich. Verschärft wird das dadurch, dass jede Datei nur **einmal
+   pro Worker-Lebensdauer** aufgefrischt wird: solange der Worker warm bleibt, hilft auch der
+   dritte Reload nicht. Zuverlässig ist nur `VERSION` hochzählen (dann installiert der Worker neu
+   mit `cache: 'reload'`) oder den Shell-Cache löschen.
+   Zusätzlich frischt der Worker mit `cache: 'no-cache'` auf — ohne das holt er sich unter
+   Umständen genau die veraltete Datei aus dem **HTTP-Cache des Browsers** zurück, die er
+   ersetzen wollte.
 7. **Wikipedia drosselt (HTTP 429).** Eine Anfrage pro Wort × drei parallele Worker reicht schon,
    um nach ein paar hundert Wörtern gedrosselt zu werden. Deshalb Sammelabfrage
    (`titles=A|B|C`, bis zu 25 Stück) statt Einzelabfragen, und 429 als "warte kurz" behandeln,
@@ -88,6 +95,27 @@ prüft kurz nach dem Laden, ob die Seite installierbar ist, und dazu muss der Wo
 sein. In v3.3 stand dort ein `requestIdleCallback` — Folge: `beforeinstallprompt` feuerte nicht
 mehr und die App ließ sich nicht mehr installieren. Der Zeitgewinn war ohnehin eingebildet,
 `register()` arbeitet asynchron.
+
+## Startbildschirm: kein Scrollen, alles muss passen
+
+Das Spiel läuft im Querformat, oft mit sichtbarer Browserleiste — dort bleiben teils nur ~320 px
+Höhe. Regeln, damit nichts unter der Kante verschwindet:
+
+- **Nicht scrollen.** Kein `overflow-y: auto` auf den Spalten. Was nicht passt, muss kleiner
+  werden, nicht wegrutschen.
+- **Blöcke verteilen sich mit `space-between`** über die volle Höhe. Zusammengehöriges (Label +
+  Knopfreihe) steckt in einem `.start-block`, sonst reißt es auseinander.
+- **Maße hängen an der Viewport-Höhe**, nicht an der Breite: `clamp(…, Xvh, …)` für Schriftgrößen,
+  Innenabstände und Lücken. Im Querformat ist die Höhe die knappe Größe, nicht die Breite.
+- **Ränder gehören ans Raster** (`.start-inner { padding }`), nicht an einzelne Elemente. Nichts
+  wird `position: fixed` an den Bildschirmrand geklebt — das Versionslabel hing so ohne Abstand
+  in der Ecke und überlagerte den Inhalt.
+- Unter 430 px Höhe greift eine Media Query, die zusätzlich Beiwerk kürzt (Untertitel im
+  Kalibrier-Kasten raus, engere Knöpfe).
+
+Nach jeder Layout-Änderung gegenprüfen: bei 740×280, 915×320 und 915×412 darf
+`scrollHeight - clientHeight` beider Spalten **0** sein und kein Element außerhalb des Viewports
+liegen.
 
 ## Installation muss ohne `beforeinstallprompt` funktionieren
 

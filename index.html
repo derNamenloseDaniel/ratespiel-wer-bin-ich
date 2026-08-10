@@ -96,30 +96,46 @@
 
     <!-- LEFT col: title + lang + mode -->
     <div class="start-col start-col-left">
-      <h1 data-i18n="appTitle">Wer bin ich?</h1>
-      <div class="row">
-        <button class="lang-btn active" data-lang="de">🇩🇪 DE</button>
-        <button class="lang-btn" data-lang="en">🇬🇧 EN</button>
+
+      <div class="title-row">
+        <h1 data-i18n="appTitle">Wer bin ich?</h1>
+        <!-- Nur die aktive Flagge, Auswahl per Aufklappen. Der Pfeil macht
+             sichtbar, dass hier etwas anzutippen ist. -->
+        <div class="lang-select">
+          <button id="lang-current" class="lang-trigger" aria-haspopup="listbox" aria-expanded="false">
+            <span id="lang-flag">🇩🇪</span>
+            <span id="lang-code">DE</span>
+            <span class="lang-caret" aria-hidden="true">▾</span>
+          </button>
+          <div id="lang-menu" class="lang-menu hidden" role="listbox">
+            <button class="lang-option active" data-lang="de" role="option">🇩🇪 DE</button>
+            <button class="lang-option" data-lang="en" role="option">🇬🇧 EN</button>
+          </div>
+        </div>
       </div>
-      <div class="section-label" data-i18n="modeLabel">Spielmodus</div>
-      <div class="row">
-        <button class="mode-btn active" data-mode="word" data-i18n="modeWord">Wort</button>
-        <button class="mode-btn" data-mode="image" data-i18n="modeImage">Bild</button>
-        <button id="btn-dl-all" class="dl-all-btn" data-i18n="dlAll">⬇ Bilder für offline</button>
+
+      <div class="start-block">
+        <div class="section-label" data-i18n="modeLabel">Spielmodus</div>
+        <div class="row">
+          <button class="mode-btn active" data-mode="word" data-i18n="modeWord">Wort</button>
+          <button class="mode-btn" data-mode="image" data-i18n="modeImage">Bild</button>
+          <button id="btn-dl-all" class="dl-all-btn" data-i18n="dlAll">⬇ Bilder für offline</button>
+        </div>
+        <div id="storage-line" class="storage-line hidden">
+          <span id="storage-size"></span>
+          <button id="btn-storage-clear" class="storage-clear" data-i18n="clearImages">Leeren</button>
+        </div>
       </div>
-      <div id="storage-line" class="storage-line hidden">
-        <span id="storage-size"></span>
-        <button id="btn-storage-clear" class="storage-clear" data-i18n="clearImages">Leeren</button>
-      </div>
-      <div class="calib-teaser" style="position:relative">
+
+      <div class="calib-teaser">
         <div class="calib-teaser-icon">📱</div>
         <div class="calib-teaser-text">
           <strong data-i18n="calibTeaserTitle">Kipperkennung kalibrieren</strong>
           <span data-i18n="calibTeaserDesc">Damit Richtig &amp; Falsch zuverlässig erkannt werden</span>
         </div>
-        <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+        <div class="calib-teaser-btns">
           <button id="btn-open-calib" class="calib-teaser-btn" data-i18n="calibTeaserBtn">Kalibrieren</button>
-          <button id="btn-open-debug" class="calib-teaser-btn" style="background:var(--accent2);font-size:0.65rem">Testen</button>
+          <button id="btn-open-debug" class="calib-teaser-btn calib-teaser-btn-alt">Testen</button>
         </div>
         <div id="calib-done-overlay" class="calib-done-overlay hidden">
           ✅ Kalibriert – antippen zum Ändern
@@ -135,14 +151,17 @@
         <button id="btn-sensor" class="btn-secondary" data-i18n="sensorBtn">Sensor erlauben</button>
       </div>
 
-      <div id="offline-status" class="offline-status wait">Wird für offline vorbereitet…</div>
-
-      <!-- Immer erreichbarer Weg zur Installation, auch ohne beforeinstallprompt -->
-      <button id="btn-install-inline" class="install-inline hidden" data-i18n="installBtn">📲 Als App installieren</button>
+      <div class="start-footer">
+        <span class="version-label">v3.5 <span id="boot-ms"></span></span>
+        <div id="offline-status" class="offline-status wait">Wird für offline vorbereitet…</div>
+        <!-- Immer erreichbarer Weg zur Installation, auch ohne beforeinstallprompt -->
+        <button id="btn-install-inline" class="install-inline hidden" data-i18n="installBtn">📲 Als App installieren</button>
+      </div>
     </div>
 
     <!-- RIGHT col: round mode + sub-options + start -->
     <div class="start-col start-col-right">
+      <div class="start-block">
       <div class="section-label" data-i18n="roundLabel">Runden</div>
       <div class="row">
         <button class="round-btn active" data-rmode="infinite" data-i18n="roundInfinite">Unendlich</button>
@@ -176,14 +195,14 @@
           <span data-i18n="cardsSuffix"> Karten</span>
         </div>
       </div>
+      </div>
 
-      <button id="btn-to-category" class="btn-primary" data-i18n="startBtn">Starten</button>
+      <button id="btn-to-category" class="btn-primary btn-start-big" data-i18n="startBtn">Starten</button>
       <!-- Auto-start button hidden until orientation-independent detection is implemented -->
       <button id="btn-to-category-auto" class="btn-primary hidden" style="background:var(--accent2)">Spielen (auto)</button>
     </div>
 
   </div>
-  <span class="version-label">v3.4 <span id="boot-ms"></span></span>
 </div>
 
 <!-- ── SCREEN: CATEGORY ────────────────────────────────────────────────── -->
