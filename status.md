@@ -1,6 +1,6 @@
 # Status – Ratespiel „Wer bin ich?"
 
-Stand: 10.08.2026 · **v4.0 ist live** auf GitHub Pages. Offline-Test auf dem Handy bestanden.
+Stand: 10.08.2026 · **v4.1 ist live** auf GitHub Pages. Offline-Test auf dem Handy bestanden.
 
 ## In Arbeit
 
@@ -15,6 +15,10 @@ Stand: 10.08.2026 · **v4.0 ist live** auf GitHub Pages. Offline-Test auf dem Ha
 *(nichts offen)*
 
 ## Warten auf Feedback
+
+- **Daniel: Kipperkennung im Spiel gegentesten** (1 SP) — Sensor und Umdrehen hat er schon
+  bestätigt. Offen ist, ob „Mitte setzen“ die Haltung so übernimmt, wie er es erwartet, und ob
+  die Bilder in den heiklen Kategorien (Verben, Speisen) jetzt passen.
 
 - **Daniel: App aus der App-Übersicht holen oder dort deinstallieren** (1 SP) — der Browser meldet
   sie als installiert, deshalb bietet er das Installieren nicht an. Entweder liegt sie einfach
@@ -39,6 +43,14 @@ Stand: 10.08.2026 · **v4.0 ist live** auf GitHub Pages. Offline-Test auf dem Ha
 
 - **10.08.2026 – Offline-Test auf dem Handy bestanden** („klappt"). Damit ist der eigentliche
   Anlass — das Spiel lief auf dem Fest ohne Internet nicht — erledigt.
+- **10.08.2026 – v4.1: falsche Bilder und getrennte Kipp-Knöpfe.** Von Daniel gemeldet: beim Wort
+  „singen“ erschien das Wappen von Singen am Hohentwiel. Die Volltextsuche entscheidet
+  Mehrdeutigkeit fast immer zugunsten von Ortsnamen. Jetzt werden Seiten mit Koordinaten und
+  SVG-Grafiken je Kategorie verworfen, und die Suche prüft vier Treffer auf einmal — „singen“
+  findet damit wieder den Artikel *Gesang*. Bild-Gedächtnis auf v2 hochgezählt, sonst hätten
+  bestehende Spieler die falschen Bilder behalten.
+  Ebenfalls gemeldet: „Umdrehen“ hat den Nullpunkt mit überschrieben. Getrennt in „Mitte setzen“
+  (misst die aktuelle Haltung ein) und „Umdrehen“ (nur noch Richtungswechsel).
 - **10.08.2026 – v4.0: Kipperkennung neu gebaut, Kalibrierung entfällt.** Von Daniel gemeldet:
   überempfindlich und falsch erkennend, vorne mit etwas Seitwärtsneigung zählt nicht mehr.
   Ursache war die Messgröße: die Projektion einer Vektordifferenz auf eine eingemessene Richtung

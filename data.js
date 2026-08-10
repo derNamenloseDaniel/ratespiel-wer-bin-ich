@@ -1,3 +1,11 @@
+// Zwei Kennzeichen steuern die Bildauswahl (siehe imgPolicy in app.js):
+//   geo:    true  -> Artikel mit Koordinaten sind hier die RICHTIGE Bedeutung.
+//                    Ueberall sonst werden sie verworfen, weil die Suche
+//                    Alltagswoerter sonst auf gleichnamige Orte abbildet
+//                    ("singen" -> Singen am Hohentwiel, samt Wappen).
+//   vector: true  -> SVG-Grafiken sind erwuenscht (Flaggen, Logos).
+//                    Sonst verworfen, weil Wappen und Karten als Bildraetsel
+//                    nichts taugen.
 const CATEGORIES = [
   {
     id: 'persons',
@@ -58,6 +66,7 @@ const CATEGORIES = [
   },
   {
     id: 'brands',
+    vector: true,
     onlyDE: false,
     words: {
       de: ['Apple','Nike','Adidas','Mercedes','BMW','Volkswagen','Audi','Porsche','Ferrari','Lamborghini','Tesla','Samsung','Google','Microsoft','Amazon','Facebook','Instagram','YouTube','TikTok','Netflix','Spotify','Lego','Ikea','H&M','Zara','Louis Vuitton','Gucci','Prada','Chanel','Rolex','Coca-Cola','Pepsi','McDonald\'s','Burger King','Subway','KFC','Starbucks','Red Bull','Nutella','Milka','Haribo','Nivea','Schwarzkopf','Siemens','Bosch','Miele','Dyson','Philips','Sony','Nintendo','Playstation'],
@@ -66,6 +75,7 @@ const CATEGORIES = [
   },
   {
     id: 'places',
+    geo: true,
     onlyDE: false,
     words: {
       de: ['Eiffelturm','Big Ben','Kolosseum','Akropolis','Sagrada Família','Taj Mahal','Chinesische Mauer','Machu Picchu','Chichén Itzá','Angkor Wat','Pyramiden von Gizeh','Stonehenge','Parthenon','Pantheon','Vatikan','Brandenburger Tor','Neuschwanstein','Kölner Dom','Freiheitsstatue','Golden Gate Bridge','Niagara-Fälle','Grand Canyon','Times Square','Hollywood','Las Vegas','Sydney Opera','Uluru','Petra','Alhambra','Burj Khalifa','Burj Al Arab','Hagia Sophia','Blaue Moschee','Kremlin','Roter Platz','Louvre','Trevi-Brunnen','Piazza San Marco','Leaning Tower of Pisa','Rijksmuseum','Anne-Frank-Haus','Atomium','Manneken Pis','Mont Saint-Michel','Schloss Versailles','Barcelona','Santorini'],
@@ -74,6 +84,8 @@ const CATEGORIES = [
   },
   {
     id: 'countries',
+    geo: true,
+    vector: true,
     onlyDE: false,
     words: {
       de: ['Deutschland','Frankreich','Spanien','Italien','Portugal','Griechenland','Türkei','Russland','Ukraine','Polen','Tschechien','Österreich','Schweiz','Niederlande','Belgien','Schweden','Norwegen','Dänemark','Finnland','Island','Irland','Großbritannien','USA','Kanada','Mexiko','Brasilien','Argentinien','Chile','Peru','Kolumbien','Kuba','Japan','China','Indien','Australien','Neuseeland','Südafrika','Ägypten','Marokko','Nigeria','Kenia','Saudi-Arabien','Iran','Irak','Israel','Thailand','Vietnam','Indonesien','Malaysia','Singapur'],
@@ -82,6 +94,8 @@ const CATEGORIES = [
   },
   {
     id: 'cities_de',
+    geo: true,
+    vector: true,
     onlyDE: true,
     words: {
       de: ['Berlin','Hamburg','München','Köln','Frankfurt','Stuttgart','Düsseldorf','Leipzig','Dortmund','Essen','Bremen','Dresden','Hannover','Nürnberg','Duisburg','Bochum','Wuppertal','Bielefeld','Bonn','Münster','Karlsruhe','Mannheim','Augsburg','Wiesbaden','Gelsenkirchen','Mönchengladbach','Braunschweig','Kiel','Chemnitz','Aachen','Halle','Magdeburg','Freiburg','Krefeld','Lübeck','Oberhausen','Erfurt','Mainz','Rostock','Kassel','Hagen','Hamm','Saarbrücken','Mülheim','Potsdam','Ludwigshafen','Oldenburg','Leverkusen','Osnabrück','Solingen'],

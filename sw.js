@@ -7,7 +7,7 @@
 // Der catch() greift also nie oder erst nach Minuten → die App startete nicht.
 // Deshalb: Shell IMMER zuerst aus dem Cache, Netz nur noch im Hintergrund.
 
-const VERSION   = 'v37';
+const VERSION   = 'v38';
 const SHELL     = `ratespiel-shell-${VERSION}`;
 const MEDIA     = 'ratespiel-media';   // Wikipedia-Bilder/-Antworten, überlebt Versionswechsel
 // Reicht für alle elf Kategorien (~540 Bilder) mit reichlich Luft. Gezählt

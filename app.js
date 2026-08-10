@@ -96,8 +96,13 @@ function loadImage(src, ms = NET_TIMEOUT) {
 // Wort → Bild-URL (oder '' für "es gibt keins"). Liegt im localStorage, damit
 // offline gar keine API-Anfrage mehr nötig ist: die URL steht fest, die Bytes
 // liegen im Media-Cache des Service Workers.
-const IMG_MEMO_KEY = 'img_memo_v1';
-const CAT_READY_KEY = 'cat_offline_v1';
+// v2: Schluessel hochgezaehlt, weil die alten Eintraege noch die per
+// Ortsnamen falsch aufgeloesten Bilder enthalten (Wappen statt Motiv).
+const IMG_MEMO_KEY = 'img_memo_v2';
+const CAT_READY_KEY = 'cat_offline_v2';
+for (const alt of ['img_memo_v1', 'cat_offline_v1']) {
+  try { localStorage.removeItem(alt); } catch {}
+}
 
 let IMG_MEMO = {};
 try { IMG_MEMO = JSON.parse(localStorage.getItem(IMG_MEMO_KEY) || '{}'); } catch { IMG_MEMO = {}; }
@@ -122,20 +127,49 @@ function catReadySet(id, lang, count) {
 function catReadyGet(id, lang) { return catReadyMap()[`${lang}|${id}`] || 0; }
 
 // ── Wikimedia ──────────────────────────────────────────────────────────────
-async function fetchWikiImageByTitle(title, lang) {
-  const url = `https://${lang}.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(title)}&prop=pageimages&format=json&pithumbsize=600&origin=*`;
+//
+// Alltagswörter sind auf Wikipedia mehrdeutig, und die Volltextsuche entscheidet
+// die Mehrdeutigkeit fast immer zugunsten von Ortsnamen: "singen" landete bei
+// Singen (Hohentwiel) und zeigte dessen Wappen, "laufen" bei Laufen an der
+// Salzach. Deutsche Städte haben Artikel mit Wappen, und die ranken hoch.
+//
+// Zwei Filter fangen genau diese Fehltreffer ab:
+//   geo    – die Seite hat Koordinaten, ist also ein Ort. Außer in den
+//            Ortskategorien ist das immer die falsche Bedeutung.
+//   vector – das Bild ist eine SVG-Grafik, also Wappen, Flagge, Logo oder
+//            Karte statt Foto. Erwünscht nur bei Ländern (Flaggen) und
+//            Marken (Logos).
+// Beide Angaben kommen aus derselben Anfrage, kosten also nichts extra. Und
+// verworfen zu werden ist billig: seit v4.0 steht auf jeder Karte ohnehin das
+// Wort, ein fehlendes Bild fällt also kaum auf – ein falsches sehr wohl.
+function imgPolicy(catId) {
+  const cat = CATEGORIES.find(c => c.id === catId);
+  return { geo: !!cat?.geo, vector: !!cat?.vector };
+}
+
+function pickThumb(page, pol) {
+  if (!page) return null;
+  if (!pol.geo && page.coordinates) return null;
+  const src = page.thumbnail?.source;
+  if (!src) return null;
+  if (!pol.vector && /\.svg(\.|$)/i.test(src)) return null;
+  return src;
+}
+
+async function fetchWikiImageByTitle(title, lang, pol) {
+  const url = `https://${lang}.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(title)}`
+            + `&prop=pageimages%7Ccoordinates&format=json&pithumbsize=600&redirects=1&origin=*`;
   const r = await fetchTimed(url);
   const j = await r.json();
   const pages = j.query?.pages;
-  const page = pages ? Object.values(pages)[0] : null;
-  return page?.thumbnail?.source || null;
+  return pickThumb(pages ? Object.values(pages)[0] : null, pol);
 }
 
 // Eine Anfrage für bis zu 25 Begriffe statt 25 Anfragen. Ohne das läuft der
 // Vorabdownload nach ein paar hundert Wörtern in Wikipedias Rate-Limit.
-async function wikiThumbsBatch(titles, lang) {
+async function wikiThumbsBatch(titles, lang, pol) {
   const url = `https://${lang}.wikipedia.org/w/api.php?action=query&format=json&origin=*`
-            + `&prop=pageimages&pithumbsize=600&redirects=1&titles=`
+            + `&prop=pageimages%7Ccoordinates&pithumbsize=600&redirects=1&titles=`
             + titles.map(encodeURIComponent).join('%7C');
   const r = await fetchTimed(url, 15000);
   const j = await r.json();
@@ -152,7 +186,8 @@ async function wikiThumbsBatch(titles, lang) {
 
   const thumbs = new Map();
   for (const p of Object.values(q.pages || {})) {
-    if (p.thumbnail?.source) thumbs.set(p.title, p.thumbnail.source);
+    const src = pickThumb(p, pol);
+    if (src) thumbs.set(p.title, src);
   }
 
   const out = new Map();
@@ -161,31 +196,37 @@ async function wikiThumbsBatch(titles, lang) {
 }
 
 // Wirft bei Netzproblemen, gibt null zurück wenn die API geantwortet hat,
-// es aber schlicht kein Bild gibt. Diese Unterscheidung ist wichtig: das eine
-// heißt "Karte überspringen", das andere "offline, Wort zeigen".
-async function lookupWikiImage(term, skipDirect = false) {
+// es aber kein brauchbares Bild gibt.
+async function lookupWikiImage(term, pol, skipDirect = false) {
   const lang = S.lang === 'de' ? 'de' : 'en';
-  const direct = skipDirect ? null : await fetchWikiImageByTitle(term, lang);
+  const direct = skipDirect ? null : await fetchWikiImageByTitle(term, lang, pol);
   if (direct) return direct;
 
-  const searchUrl = `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(term)}&srlimit=3&format=json&origin=*`;
-  const sr = await fetchTimed(searchUrl);
-  const sj = await sr.json();
-  const hits = sj.query?.search || [];
-  for (const hit of hits) {
-    const img = await fetchWikiImageByTitle(hit.title, lang);
-    if (img) return img;
+  // Die Suche liefert mehrere Treffer. Statt Titel für Titel einzeln zu fragen,
+  // holen wir sie in einem Rutsch und nehmen den ersten, der die Filter
+  // übersteht — spart Anfragen und findet den passenden Artikel auch dann,
+  // wenn ein Ortsname davor liegt.
+  const searchUrl = `https://${lang}.wikipedia.org/w/api.php?action=query&list=search`
+                  + `&srsearch=${encodeURIComponent(term)}&srlimit=4&format=json&origin=*`;
+  const sj = await (await fetchTimed(searchUrl)).json();
+  const hits = (sj.query?.search || []).map(h => h.title);
+  if (!hits.length) return null;
+
+  const found = await wikiThumbsBatch(hits, lang, pol);
+  for (const titel of hits) {
+    const url = found.get(titel);
+    if (url) return url;
   }
   return null;
 }
 
 // → { url: string|null, offline: bool }
-async function resolveImage(term, skipDirect = false) {
-  const key = `${S.lang}|${term}`;
+async function resolveImage(term, pol, skipDirect = false) {
+  const key = `${S.lang}|${pol.geo ? 'g' : ''}${pol.vector ? 'v' : ''}|${term}`;
   if (key in IMG_MEMO) return { url: IMG_MEMO[key] || null, offline: false };
   if (!navigator.onLine) return { url: null, offline: true };
   try {
-    const url = await lookupWikiImage(term, skipDirect);
+    const url = await lookupWikiImage(term, pol, skipDirect);
     memoSet(key, url || '');
     noteNetSuccess();
     return { url, offline: false };
@@ -376,7 +417,7 @@ function showCategory() {
 // antwortet – sonst läuft man in lauter 5-Sekunden-Timeouts.
 // onProgress bekommt einen Bruchteil 0..1. Die Bild-Bytes sind der langsame
 // Teil, also bekommt der auch den größten Teil des Balkens.
-async function prefetchWords(words, suffix, onProgress) {
+async function prefetchWords(words, suffix, onProgress, pol) {
   const lang  = S.lang === 'de' ? 'de' : 'en';
   const terms = [...new Set(words.map(w => w + suffix))];
   const total = terms.length;
@@ -394,7 +435,7 @@ async function prefetchWords(words, suffix, onProgress) {
   for (let i = 0; i < unknown.length && !aborted; i += 25) {
     const chunk = unknown.slice(i, i + 25);
     try {
-      const found = await wikiThumbsBatch(chunk, lang);
+      const found = await wikiThumbsBatch(chunk, lang, pol);
       for (const term of chunk) {
         const url = found.get(term);
         if (url) memoSet(key(term), url); else missedDirect.add(term);
@@ -411,7 +452,7 @@ async function prefetchWords(words, suffix, onProgress) {
   // Volltextsuche – nacheinander, damit das Limit nicht doch noch reißt.
   const rest = aborted ? [] : [...missedDirect];
   for (let i = 0; i < rest.length && !aborted; i++) {
-    const res = await resolveImage(rest[i], true);   // direkte Abfrage war schon erfolglos
+    const res = await resolveImage(rest[i], pol, true);  // Direktabfrage war schon erfolglos
     if (note(res.offline) >= 5) aborted = true;
     onProgress?.(0.2 + (i + 1) / rest.length * 0.2);
   }
@@ -442,7 +483,8 @@ async function prefetchCategory(cat, btn) {
   const r = await prefetchWords(
     words,
     cat.imageSearchSuffix?.[S.lang] || '',
-    frac => { btn.textContent = `${Math.round(frac * 100)} %`; }
+    frac => { btn.textContent = `${Math.round(frac * 100)} %`; },
+    imgPolicy(cat.id)
   );
 
   catReadySet(cat.id, S.lang, r.ok);
@@ -468,7 +510,8 @@ async function prefetchAll(btn) {
     const r = await prefetchWords(
       words,
       cat.imageSearchSuffix?.[S.lang] || '',
-      frac => { btn.textContent = `${Math.round((before + frac * words.length) / grand * 100)} %`; }
+      frac => { btn.textContent = `${Math.round((before + frac * words.length) / grand * 100)} %`; },
+      imgPolicy(cat.id)
     );
     catReadySet(cat.id, S.lang, r.ok);
     before += r.total;
@@ -520,7 +563,7 @@ async function showCard() {
   $('card-word').textContent = word;      // sofort lesbar, ohne aufs Netz zu warten
   updateProgress();
 
-  const res = await resolveImage(searchTermFor(word));
+  const res = await resolveImage(searchTermFor(word), imgPolicy(S.category));
   if (S.index !== shownFor) return;       // Karte ist inzwischen weiter
   if (!res.url) { if (res.offline) setOffline(true); return; }
 
@@ -534,7 +577,7 @@ async function showCard() {
 
   // Nächste Karte im Hintergrund vorbereiten
   const next = S.deck[S.index + 1];
-  if (next && navigator.onLine) resolveImage(searchTermFor(next));
+  if (next && navigator.onLine) resolveImage(searchTermFor(next), imgPolicy(S.category));
 }
 
 function updateProgress() {
@@ -742,8 +785,11 @@ function startTilt() {
   _tilt.g = null;
   _tilt.armed = false;
   _tilt.since = 0;
-  _tilt.baseline = { until: performance.now() + TILT.baseMs, vals: [] };
   loadCalib();
+  // Ohne von Hand gesetzten Nullpunkt misst die Runde ihn selbst ein. Mit
+  // gesetztem Nullpunkt bleibt der stehen — sonst wäre der Knopf wirkungslos.
+  _tilt.baseline = _tilt.manual ? null : { until: performance.now() + TILT.baseMs, vals: [] };
+  _tilt.armed = !_tilt.baseline;
 
   tiltSubscribe((x, y, z, filtered) => {
     const s = tiltFeed(x, y, z, filtered);
@@ -804,6 +850,37 @@ function stopTilt() {
   _tilt.baseline = null;
 }
 
+// Aktuelle Haltung als Nullpunkt merken. Bewusst über eine kurze Messung statt
+// einer Einzelprobe, und nur die zweite Hälfte zählt — die erste braucht der
+// Tiefpass zum Einschwingen.
+async function captureZero(btn) {
+  if (btn.dataset.busy) return;
+  btn.dataset.busy = '1';
+  btn.textContent = '…';
+
+  loadCalib();
+  stopTilt();
+  _tilt.g = null;
+  const vals = [];
+  tiltSubscribe((x, y, z, filtered) => {
+    const s = tiltFeed(x, y, z, filtered);
+    if (s) vals.push(s.pitch);
+  });
+  await sleep(TILT.baseMs);
+  stopTilt();
+
+  if (vals.length >= 4) {
+    const hinten = vals.slice(Math.floor(vals.length / 2));
+    _tilt.neutral = hinten.reduce((a, b) => a + b, 0) / hinten.length;
+    _tilt.manual = true;
+    saveCalib();
+    btn.textContent = `${t('zeroDone')} ${Math.round(_tilt.neutral)}°`;
+  } else {
+    btn.textContent = t('zeroFail');     // kein Sensor oder keine Freigabe
+  }
+  setTimeout(() => { btn.textContent = t('zeroTilt'); btn.dataset.busy = ''; }, 1600);
+}
+
 async function requestSensor() {
   if (typeof DeviceMotionEvent?.requestPermission === 'function') {
     try {
@@ -822,15 +899,25 @@ async function requestSensor() {
 // senkrecht ist 0°, die Ruhelage führt sich während des Spiels selbst nach,
 // und die Richtung ist physikalisch festgelegt. Bleibt genau ein Handgriff
 // für den Fall, dass ein Gerät die Achse gespiegelt meldet: umdrehen.
+function saveCalib() {
+  try {
+    localStorage.setItem('tilt_calib_v2', JSON.stringify({
+      neutral: _tilt.neutral, sign: _tilt.sign, manual: !!_tilt.manual,
+    }));
+  } catch {}
+}
+
 function loadCalib() {
   try {
     const c = JSON.parse(localStorage.getItem('tilt_calib_v2') || 'null');
     if (c) {
       _tilt.neutral = Number.isFinite(c.neutral) ? c.neutral : 0;
       _tilt.sign = c.sign === 1 ? 1 : -1;
+      _tilt.manual = !!c.manual;
       return true;
     }
   } catch {}
+  _tilt.manual = false;
   // Ohne Kalibrierung ist die Physik der beste Vorgabewert: senkrecht gehalten
   // ist 0°, und nach vorne kippen dreht den Bildschirm zum Boden (gz negativ).
   _tilt.neutral = 0;
@@ -1044,12 +1131,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Kipprichtung umdrehen – der einzige Handgriff, den die Erkennung noch
-  // braucht, falls Richtig und Weiter auf einem Gerät vertauscht ankommen.
+  // Zwei getrennte Handgriffe, bewusst ohne Überschneidung:
+  // "Mitte setzen" merkt sich die aktuelle Haltung als Nullpunkt,
+  // "Umdrehen" vertauscht nur Richtig und Weiter. Vorher hat Umdrehen den
+  // Nullpunkt gleich mit überschrieben — das war ein Fehler.
+  $('btn-zero-tilt').addEventListener('click', () => captureZero($('btn-zero-tilt')));
+
   $('btn-flip-tilt').addEventListener('click', () => {
-    loadCalib();
+    loadCalib();                       // Nullpunkt unangetastet übernehmen
     _tilt.sign = -_tilt.sign;
-    try { localStorage.setItem('tilt_calib_v2', JSON.stringify({ neutral: 0, sign: _tilt.sign })); } catch {}
+    saveCalib();
     const b = $('btn-flip-tilt');
     b.textContent = t('flipDone');
     setTimeout(() => { b.textContent = t('flipTilt'); }, 1400);

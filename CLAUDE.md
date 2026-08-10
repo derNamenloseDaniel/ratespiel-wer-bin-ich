@@ -44,6 +44,7 @@ Nie vergessen. Keine Ausnahme.
 | v3.8        | v34        | 2026-08-10 | Erkennt über `getInstalledRelatedApps`, ob die App noch installiert ist, und sagt das statt eine nutzlose Anleitung zu zeigen; `requestFullscreen`-Ablehnung abgefangen |
 | v3.9        | v35        | 2026-08-10 | Dialoge passen sich der Höhe an (`max-height: 100%`, Maße in `vh`); reicht es nicht, scrollt der Inhalt statt über den Rand zu laufen |
 | v4.0        | v37        | 2026-08-10 | Kipperkennung neu: ein Neigungswinkel statt Vektorprojektion, Kalibrier-Assistent entfällt; Wort und Bild immer zusammen statt Modus-Auswahl |
+| v4.1        | v38        | 2026-08-10 | Bilder: Orts- und SVG-Treffer je Kategorie verwerfen („singen" → Wappen von Singen); Nullpunkt und Kipprichtung als getrennte Knöpfe |
 
 ## Offline – die Regeln, die dabei gelernt wurden
 
@@ -204,6 +205,38 @@ zusätzlich in den Offline-Cache.
 Bezugspunkt ohne Rotationsmathematik ist verlässlicher als selbstgebaute Drehmatrizen — flach mit
 Bildschirm nach oben ist laut Spezifikation `az = +9,81`, nach unten `-9,81`. In zwei Anläufen war
 mein Prüfstand seitenverkehrt und die App richtig; erst der feste Bezugspunkt hat das geklärt.
+
+**Nullpunkt und Richtung sind zwei getrennte Knöpfe** — und müssen es bleiben. „Mitte setzen"
+merkt sich die aktuelle Haltung (700 ms messen, nur die zweite Hälfte mitteln, die erste braucht
+der Tiefpass zum Einschwingen) und setzt `manual: true`; ab dann überspringt der Rundenstart seine
+eigene Einmessung, sonst wäre der Knopf wirkungslos. „Umdrehen" vertauscht **nur** das Vorzeichen.
+In v4.0 hat Umdrehen den Nullpunkt gleich mit auf 0 gesetzt — für den Nutzer sah das so aus, als
+würde die aktuelle Haltung zum Nullpunkt gemacht.
+
+## Bildauswahl: Ortsnamen und Grafiken verwerfen
+
+Alltagswörter sind auf Wikipedia mehrdeutig, und die Volltextsuche entscheidet fast immer
+zugunsten von Ortsnamen — deutsche Städte haben ausführliche Artikel und ranken hoch. „singen"
+landete bei *Singen (Hohentwiel)* und zeigte dessen Wappen, „laufen" bei *Laufen an der Salzach*.
+
+Zwei Filter, beide aus derselben Anfrage (`prop=pageimages|coordinates`, kostet nichts extra):
+
+| Kennzeichen in `data.js` | Bedeutung |
+|---|---|
+| `geo: true` | Artikel **mit** Koordinaten sind hier die richtige Bedeutung (places, countries, cities_de). Überall sonst verworfen. |
+| `vector: true` | SVG-Grafiken sind erwünscht — Flaggen und Logos (countries, brands, cities_de). Sonst verworfen, weil Wappen und Karten als Bildrätsel nichts taugen. |
+
+Dazu holt die Suche jetzt vier Treffer und prüft sie **in einem Rutsch** statt Titel für Titel:
+so wird der passende Artikel auch dann gefunden, wenn ein Ortsname davor liegt. Genau das macht
+aus „singen" wieder *Gesang*.
+
+Verworfen zu werden ist billig, seit auf jeder Karte ohnehin das Wort steht — ein fehlendes Bild
+fällt kaum auf, ein falsches sehr wohl. Im Zweifel also strenger filtern.
+
+Beim Ändern dieser Regeln **`IMG_MEMO_KEY` hochzählen**: die alten Einträge im localStorage
+enthalten sonst weiter die falsch aufgelösten Bilder, und der Fix greift bei niemandem, der schon
+gespielt hat. `CAT_READY_KEY` gleich mit, sonst behauptet die Kategorie „✅ 45 Bilder", während das
+Gedächtnis leer ist.
 
 ## Wort und Bild: keine Auswahl mehr
 
