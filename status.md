@@ -1,6 +1,6 @@
 # Status – Ratespiel „Wer bin ich?"
 
-Stand: 10.08.2026 · **v3.6 ist live** auf GitHub Pages. Offline-Test auf dem Handy bestanden.
+Stand: 10.08.2026 · **v3.8 ist live** auf GitHub Pages. Offline-Test auf dem Handy bestanden.
 
 ## In Arbeit
 
@@ -20,7 +20,7 @@ Stand: 10.08.2026 · **v3.6 ist live** auf GitHub Pages. Offline-Test auf dem Ha
   steht jetzt „📲 Als App installieren". Falls Chrome keinen Dialog anbietet, zeigt der Knopf die
   Anleitung über das ⋮-Menü.
 - **Daniel: Startdauer vom Handy ablesen** (1 SP) — App vom Home-Bildschirm starten, in der
-  Fußzeile steht `v3.6 · <Zahl> ms`. Kleine Zahl trotz langem Warten heißt: die Zeit vergeht
+  Fußzeile steht `v3.8 · <Zahl> ms`. Kleine Zahl trotz langem Warten heißt: die Zeit vergeht
   **vor** unserem Code (Browser-Kaltstart, Service-Worker-Start, PWA-Splash) und lässt sich in
   der App nicht wegoptimieren. Große Zahl heißt: es liegt weiter bei uns, dann weitersuchen.
 
@@ -38,6 +38,12 @@ Stand: 10.08.2026 · **v3.6 ist live** auf GitHub Pages. Offline-Test auf dem Ha
 
 - **10.08.2026 – Offline-Test auf dem Handy bestanden** („klappt"). Damit ist der eigentliche
   Anlass — das Spiel lief auf dem Fest ohne Internet nicht — erledigt.
+- **10.08.2026 – v3.8: Installations-Sackgasse erklärt statt Anleitung ins Leere.** Wunsch war ein
+  echter Installations-Knopf; das ist technisch unmöglich (nur `beforeinstallprompt`, Safari hat
+  gar nichts). Der wahrscheinliche Grund für das fehlende Ereignis: die App gilt noch als
+  installiert, weil ein vom Startbildschirm gewischtes Symbol die WebAPK nicht deinstalliert.
+  Der Knopf prüft das jetzt über `getInstalledRelatedApps` und sagt es, statt eine nutzlose
+  Anleitung zu zeigen. Nebenbei: `requestFullscreen`-Ablehnung wird abgefangen.
 - **10.08.2026 – v3.6: `100dvh` statt `100vh`.** Der Installations-Knopf war weiter unsichtbar,
   obwohl das Layout in jeder lokal geprüften Größe passte. `100vh` meint auf Android Chrome die
   Höhe *ohne* Adressleiste; da die Seite bewusst nicht scrollt, klappt die Leiste nie weg und der

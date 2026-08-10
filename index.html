@@ -28,6 +28,11 @@
       Tippe oben rechts im Browser auf <strong>⋮</strong> und dann auf
       <strong>„App installieren"</strong> bzw. <strong>„Zum Startbildschirm hinzufügen"</strong>.
     </div>
+    <div id="install-already-hint" class="install-ios-hint hidden">
+      Sie liegt in deiner App-Übersicht — such dort nach <strong>Ratespiel</strong>.<br>
+      Ein vom Startbildschirm gewischtes Symbol entfernt nur die Verknüpfung.
+      Richtig deinstallieren geht über <strong>Einstellungen → Apps → Ratespiel</strong>.
+    </div>
     <div class="install-btns">
       <button id="btn-install-app" class="btn-primary">Als App installieren</button>
       <button id="btn-install-skip" class="btn-secondary">Im Browser öffnen</button>
@@ -152,7 +157,7 @@
       </div>
 
       <div class="start-footer">
-        <span class="version-label">v3.6 <span id="boot-ms"></span></span>
+        <span class="version-label">v3.8 <span id="boot-ms"></span></span>
         <div id="offline-status" class="offline-status wait">Wird für offline vorbereitet…</div>
         <!-- Immer erreichbarer Weg zur Installation, auch ohne beforeinstallprompt -->
         <button id="btn-install-inline" class="install-inline hidden" data-i18n="installBtn">📲 Als App installieren</button>

@@ -52,6 +52,10 @@ const TRANSLATIONS = {
     catNeedsDownload: 'Offline nicht verfügbar – Bilder wurden nicht vorab geladen',
     installBtn: '📲 Als App installieren',
     close: 'Schließen',
+    installedTitle: 'Schon installiert',
+    installedDesc: 'Der Browser meldet die App als installiert – deshalb bietet er das Installieren nicht noch einmal an.',
+    installTitle: 'App installieren?',
+    installDesc: 'Für das beste Erlebnis als App installieren – funktioniert offline und startet im Vollbild.',
     cats: {
       persons: 'Berühmte Personen',
       jobs: 'Berufe',
@@ -119,6 +123,10 @@ const TRANSLATIONS = {
     catNeedsDownload: 'Not available offline – images were not downloaded',
     installBtn: '📲 Install as app',
     close: 'Close',
+    installedTitle: 'Already installed',
+    installedDesc: 'The browser reports the app as installed – that is why it will not offer to install it again.',
+    installTitle: 'Install app?',
+    installDesc: 'Install it as an app for the best experience – works offline and starts fullscreen.',
     cats: {
       persons: 'Famous People',
       jobs: 'Professions',

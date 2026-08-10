@@ -41,6 +41,7 @@ Nie vergessen. Keine Ausnahme.
 | v3.4        | v29        | 2026-08-10 | SW-Registrierung wieder sofort (v3.3 hat damit die Installierbarkeit zerschossen); dauerhafter „Als App installieren"-Knopf mit Anleitung, wenn der Browser kein `beforeinstallprompt` schickt |
 | v3.5        | v31        | 2026-08-10 | Startbildschirm neu aufgeteilt: kein Scrollen, Ränder ringsum, Sprachauswahl als Aufklappmenü rechts vom Titel, Maße an der Viewport-Höhe; SW frischt am HTTP-Cache vorbei auf |
 | v3.6        | v32        | 2026-08-10 | `100dvh` statt `100vh` — auf Android Chrome lag der untere Streifen samt Fußzeile und Installations-Knopf hinter der Adressleiste |
+| v3.8        | v34        | 2026-08-10 | Erkennt über `getInstalledRelatedApps`, ob die App noch installiert ist, und sagt das statt eine nutzlose Anleitung zu zeigen; `requestFullscreen`-Ablehnung abgefangen |
 
 ## Offline – die Regeln, die dabei gelernt wurden
 
@@ -127,12 +128,26 @@ liegen.
 
 ## Installation muss ohne `beforeinstallprompt` funktionieren
 
+**Eine Webseite kann sich nicht selbst installieren.** Es gibt keine API dafür. Der einzige Hebel
+ist das vom Browser geschickte `beforeinstallprompt`, das man abfängt und später auslöst. Safari
+kennt nicht einmal das. Ein „richtiger" Installations-Knopf ohne dieses Ereignis ist technisch
+unmöglich — jeder Versuch endet zwangsläufig bei einer Anleitung.
+
 Der Knopf „Als App installieren" auf dem Startbildschirm ist immer da, solange die App im Browser
 läuft (`isStandalone()` prüft `display-mode: standalone` **und** `fullscreen` — das Manifest sagt
-`fullscreen`, `standalone` allein ist dort also falsch). Schickt der Browser ein
-`beforeinstallprompt`, löst der Knopf es aus; sonst zeigt er die Anleitung für Chrome bzw. Safari.
-Grund: Chrome unterdrückt das Ereignis unter anderem eine Weile nach einer Deinstallation — dann
-gab es vorher überhaupt keinen Weg mehr zurück auf den Home-Bildschirm.
+`fullscreen`, `standalone` allein ist dort also falsch). Was beim Antippen passiert:
+
+1. Liegt ein `beforeinstallprompt` vor → nativer Dialog.
+2. Sonst 700 ms warten und nochmal prüfen — das Ereignis trudelt manchmal verspätet ein.
+3. Meldet `navigator.getInstalledRelatedApps()` die App als installiert → **das** sagen, statt
+   eine Installationsanleitung zu zeigen, die nicht funktionieren kann. Dafür führt das Manifest
+   sich selbst unter `related_applications` (`platform: "webapp"`, absolute Manifest-URL) auf.
+4. Erst dann die Anleitung für Chrome bzw. Safari.
+
+Hintergrund zu Schritt 3: Ein vom Startbildschirm gewischtes Symbol **deinstalliert die PWA
+nicht** — die WebAPK bleibt in der App-Übersicht. Solange sie installiert ist, schickt Chrome kein
+`beforeinstallprompt` mehr, und jede Anleitung geht ins Leere. Genau in dieser Sackgasse saß der
+Nutzer.
 
 Gemessen wird nicht geschätzt: das Versionslabel zeigt die Startdauer (`v3.3 · 14 ms`). Steht dort
 eine kleine Zahl, der Start fühlt sich aber trotzdem lang an, liegt es **vor** unserem Code

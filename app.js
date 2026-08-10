@@ -881,27 +881,55 @@ window.addEventListener('beforeinstallprompt', e => {
   }
 });
 
-// Der Weg zur Installation darf nicht davon abhängen, ob der Browser uns ein
-// `beforeinstallprompt` schickt. Chrome unterdrückt das Ereignis unter anderem
-// eine Weile nach einer Deinstallation – dann stand hier vorher überhaupt keine
-// Möglichkeit mehr, die App wieder aufs Handy zu holen. Ohne Prompt zeigen wir
-// deshalb die Anleitung für den jeweiligen Browser.
+// Ist die App laut Browser schon installiert? Chrome/Android beantwortet das
+// über getInstalledRelatedApps, sofern das Manifest sich selbst unter
+// related_applications aufführt. Wichtig, weil ein vom Startbildschirm
+// gewischtes Symbol die App NICHT deinstalliert: sie bleibt installiert, und
+// solange sie das ist, schickt Chrome kein `beforeinstallprompt` mehr.
+async function installedElsewhere() {
+  try {
+    const apps = await navigator.getInstalledRelatedApps?.();
+    return Array.isArray(apps) && apps.length > 0;
+  } catch { return false; }
+}
+
+// Eine Webseite kann sich nicht selbst installieren – die einzige Möglichkeit
+// ist, das vom Browser geschickte `beforeinstallprompt` auszulösen. Fehlt es,
+// bleibt nur zu erklären, woran es liegt.
 async function openInstall() {
+  const hints = ['install-ios-hint', 'install-android-hint', 'install-already-hint'];
+
   if (_deferredInstall) {
     show('btn-install-app');
-    hide('install-ios-hint');
-    hide('install-android-hint');
+    hints.forEach(hide);
     _deferredInstall.prompt();
     await _deferredInstall.userChoice;
     _deferredInstall = null;
     hide('install-overlay');
     return;
   }
+
   hide('btn-install-app');
-  if (isIOS()) { show('install-ios-hint'); hide('install-android-hint'); }
-  else { show('install-android-hint'); hide('install-ios-hint'); }
+  hints.forEach(hide);
+  $('install-title').textContent = t('installTitle');
+  $('install-desc').textContent = t('installDesc');
   $('btn-install-skip').textContent = t('close');
   show('install-overlay');
+
+  // Das Ereignis kann kurz nach dem Laden noch eintrudeln – einmal abwarten,
+  // bevor wir aufgeben.
+  if (!(await installedElsewhere())) {
+    await sleep(700);
+    if (_deferredInstall) { hide('install-overlay'); return openInstall(); }
+  }
+
+  if (await installedElsewhere()) {
+    $('install-title').textContent = t('installedTitle');
+    $('install-desc').textContent = t('installedDesc');
+    show('install-already-hint');
+  } else {
+    show(isIOS() ? 'install-ios-hint' : 'install-android-hint');
+  }
 }
 
 // ── Update-Reload ──────────────────────────────────────────────────────────
@@ -1113,9 +1141,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   $('btn-install-skip').addEventListener('click', () => {
     hide('install-overlay');
-    // Request fullscreen so browser mode feels like the app
+    // Request fullscreen so browser mode feels like the app.
+    // Das Versprechen muss abgefangen werden: ohne echte Nutzergeste lehnt
+    // Chrome mit "Permissions check failed" ab und die Ablehnung landet
+    // ungefangen in der Konsole.
     const el = document.documentElement;
-    (el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen)?.call(el);
+    const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen;
+    try { req?.call(el)?.catch?.(() => {}); } catch {}
   });
 
   // Läuft die App im Browser statt vom Home-Bildschirm, ist der Installations-
