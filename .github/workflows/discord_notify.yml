@@ -54,8 +54,8 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           TITLE="${{ steps.version.outputs.title }}"
           DESCRIPTION="${{ steps.version.outputs.description }}"
-          LIVE_URL="https://danielzaiser91.github.io/ratespiel-wer-bin-ich/"
-          REPO_URL="https://github.com/danielzaiser91/ratespiel-wer-bin-ich/commits/main"
+          LIVE_URL="https://dernamenlosedaniel.github.io/ratespiel-wer-bin-ich/"
+          REPO_URL="https://github.com/derNamenloseDaniel/ratespiel-wer-bin-ich/commits/main"
 
           H1="# 🎮 Wer bin ich? – v${VERSION} – ${TITLE}"
           H3="### Was ist neu:"

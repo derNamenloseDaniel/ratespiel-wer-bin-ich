@@ -2,7 +2,7 @@
 
 Ein mobiles Heads-Up-Ratespiel für Gruppen — als Progressive Web App, direkt im Browser, ohne Installation.
 
-**[▶ Jetzt spielen](https://danielzaiser91.github.io/ratespiel-wer-bin-ich/)**
+**[▶ Jetzt spielen](https://dernamenlosedaniel.github.io/ratespiel-wer-bin-ich/)**
 
 ---
 
